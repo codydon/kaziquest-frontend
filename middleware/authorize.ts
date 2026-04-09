@@ -1,7 +1,9 @@
 import { ROUTE_LIST } from "~/constants/routeList";
 
 export default defineNuxtRouteMiddleware((to, from) => {
-    const { session } = useAuthSession();
+    const { session, isHydrating } = useAuthSession();
+    if (isHydrating.value) return
+
     const user = (session.value.user ?? {}) as Record<string, any>;
 
     // Get the required roles and permissions from the route meta

@@ -1,0 +1,807 @@
+diff --git a/app/composables/useApi.ts b/app/composables/useApi.ts
+index 1bc5e53..3f2afaa 100644
+--- a/app/composables/useApi.ts
++++ b/app/composables/useApi.ts
+@@ -83,7 +83,13 @@ export function useApi<T = any>(
+   // const { buildHeaders } = useHeaders('app');
+   // const { getBaseURL } = useBaseUrl();
+   const toast = useToast();
+-  const { clearSession } = useAuthSession();
++  const { clearSession, logout } = useAuthSession();
++  const refreshMetrics = useState('kq-auth-refresh-metrics', () => ({
++    attempts: 0,
++    successes: 0,
++    failures: 0,
++    retries: 0
++  }))
+   
+   const handler = options?.handler ?? 'useFetch'
+   const secured = options?.secured ?? true
+@@ -92,12 +98,15 @@ export function useApi<T = any>(
+     if (refreshInFlight) return refreshInFlight
+ 
+     refreshInFlight = (async () => {
++      refreshMetrics.value.attempts += 1
+       try {
+         const { useTokenRefresh } = await import("~/composables/useTokenRefresh")
+         const { refreshToken } = useTokenRefresh()
+         await refreshToken()
++        refreshMetrics.value.successes += 1
+         return true
+       } catch {
++        refreshMetrics.value.failures += 1
+         return false
+       } finally {
+         refreshInFlight = null
+@@ -110,7 +119,7 @@ export function useApi<T = any>(
+   const logoutOnce = async () => {
+     if (!logoutInFlight) {
+       logoutInFlight = (async () => {
+-        clearSession()
++        await logout()
+         await navigateTo(ROUTE_LIST.auth.login)
+       })().finally(() => {
+         logoutInFlight = null
+@@ -170,6 +179,7 @@ export function useApi<T = any>(
+         const refreshed = await refreshAccessToken()
+ 
+         if (refreshed) {
++          refreshMetrics.value.retries += 1
+           const retryOptions = {
+             ...requestMeta,
+             _retryAfterRefresh: true,
+diff --git a/app/composables/useAuthSession.ts b/app/composables/useAuthSession.ts
+index 43c1619..c16bcdd 100644
+--- a/app/composables/useAuthSession.ts
++++ b/app/composables/useAuthSession.ts
+@@ -1,6 +1,8 @@
+ import type { AuthMethod, AuthSessionState, AuthUser } from '~/types'
+ 
+ const AUTH_SESSION_STATE_KEY = 'kq-auth-session'
++const AUTH_SESSION_HYDRATED_KEY = 'kq-auth-session-hydrated'
++const AUTH_SESSION_HYDRATING_KEY = 'kq-auth-session-hydrating'
+ const ACCESS_TOKEN_COOKIE = 'access'
+ const REFRESH_TOKEN_COOKIE = 'refresh'
+ 
+@@ -24,8 +26,11 @@ export interface AuthTokenPair {
+ export const useAuthSession = () => {
+   const config = useRuntimeConfig()
+   const isSecureCookie = Boolean(config.public.apiBase?.startsWith('https://'))
++  const apiBase = useBaseUrl()
+ 
+   const authSession = useState<AuthSessionState>(AUTH_SESSION_STATE_KEY, createDefaultAuthSessionState)
++  const isHydrating = useState<boolean>(AUTH_SESSION_HYDRATING_KEY, () => import.meta.client)
++  const hasHydrated = useState<boolean>(AUTH_SESSION_HYDRATED_KEY, () => import.meta.server)
+ 
+   const accessToken = useCookie<string | null>(ACCESS_TOKEN_COOKIE, {
+     path: '/',
+@@ -92,10 +97,44 @@ export const useAuthSession = () => {
+     authSession.value = createDefaultAuthSessionState()
+   }
+ 
++  const beginHydration = () => {
++    isHydrating.value = true
++  }
++
++  const finishHydration = () => {
++    isHydrating.value = false
++    hasHydrated.value = true
++  }
++
++  const revokeRefreshToken = async (tokenToRevoke: string | null) => {
++    if (!tokenToRevoke) {
++      return
++    }
++
++    try {
++      await $fetch(`${apiBase}/accounts/logout/`, {
++        method: 'POST',
++        body: {
++          refresh_token: tokenToRevoke
++        }
++      })
++    } catch {
++      // Logout should still succeed locally even if the revocation API fails.
++    }
++  }
++
++  const logout = async () => {
++    const tokenToRevoke = refreshToken.value
++    clearSession()
++    await revokeRefreshToken(tokenToRevoke)
++  }
++
+   return {
+     session: readonly(authSession),
+     token: readonly(effectiveAccessToken),
+     refreshToken: readonly(effectiveRefreshToken),
++    isHydrating: readonly(isHydrating),
++    hasHydrated: readonly(hasHydrated),
+     isAuthenticated,
+     setAuthTokens,
+     setUser,
+@@ -104,6 +143,9 @@ export const useAuthSession = () => {
+     clearOtpSession,
+     setFromRoute,
+     setRedirected,
+-    clearSession
++    clearSession,
++    beginHydration,
++    finishHydration,
++    logout
+   }
+ }
+\ No newline at end of file
+diff --git a/app/pages/auth/login.vue b/app/pages/auth/login.vue
+index 677df8a..af852e1 100644
+--- a/app/pages/auth/login.vue
++++ b/app/pages/auth/login.vue
+@@ -2,6 +2,7 @@
+ import * as z from 'zod'
+ import { authService } from '~/services/auth.service'
+ import { ROUTE_LIST } from '~/constants/routeList'
++import { parseApiError } from '~/utils/parseApiError'
+ 
+ definePageMeta({
+   layout: 'auth',
+@@ -37,6 +38,7 @@ const toast = useToast()
+ 
+ const { setAuthTokens, setUser, setAuthMethod, setOtpSession } = useAuthSession()
+ const { resetSessionTimeoutState } = useSessionTimeoutState()
++const directLoginDone = ref(false)
+ 
+ const redirectPath = computed(() => {
+   const redirect = route.query.redirect
+@@ -46,6 +48,84 @@ const redirectPath = computed(() => {
+   return redirect
+ })
+ 
++const removeTokenFromUrl = () => {
++  if (typeof window === 'undefined') {
++    return
++  }
++
++  const url = new URL(window.location.href)
++  const keysToRemove = ['t', 'u', 'site_url']
++  let changed = false
++
++  for (const key of keysToRemove) {
++    if (url.searchParams.has(key)) {
++      url.searchParams.delete(key)
++      changed = true
++    }
++  }
++
++  if (changed) {
++    window.history.replaceState({}, '', url.toString())
++  }
++}
++
++const handleDirectTokenLogin = async (token: string) => {
++  loading.value = true
++  authError.value = null
++
++  try {
++    const response = await authService.fetchAuthUser({
++      handler: '$fetch',
++      secured: false,
++      headers: {
++        Authorization: `Bearer ${token}`
++      }
++    })
++
++    const payload = (response as Record<string, any>)?.data ?? (response as Record<string, any>)
++    const userData = (payload?.data ?? payload) as Record<string, any>
++
++    if (!userData || typeof userData !== 'object') {
++      throw new Error('Unable to authenticate with the provided token.')
++    }
++
++    const accessToken = typeof userData.access === 'string' && userData.access
++      ? userData.access
++      : token
++
++    setAuthTokens({
++      accessToken,
++      refreshToken: typeof userData.refresh === 'string' ? userData.refresh : null
++    })
++
++    const { access: _access, refresh: _refresh, ...user } = userData
++    setUser(user)
++    setAuthMethod('password')
++    resetSessionTimeoutState()
++    removeTokenFromUrl()
++
++    toast.add({
++      title: 'Welcome back',
++      description: 'Your account has been opened successfully.',
++      color: 'success'
++    })
++
++    await navigateTo(redirectPath.value)
++  } catch (error: unknown) {
++    const message = parseApiError(error, 'Direct login failed.')
++
++    authError.value = message
++
++    toast.add({
++      title: 'Unable to sign in',
++      description: message,
++      color: 'error'
++    })
++  } finally {
++    loading.value = false
++  }
++}
++
+ const handleLogin = async () => {
+   loading.value = true
+   authError.value = null
+@@ -108,9 +188,7 @@ const handleLogin = async () => {
+ 
+     await navigateTo(redirectPath.value)
+   } catch (error: unknown) {
+-    const message = typeof error === 'object' && error && 'data' in error
+-      ? String((error as { data?: { message?: string; statusMessage?: string } }).data?.message || (error as { data?: { statusMessage?: string } }).data?.statusMessage || 'Login failed.')
+-      : 'Login failed.'
++    const message = parseApiError(error, 'Login failed.')
+ 
+     authError.value = message
+ 
+@@ -123,6 +201,21 @@ const handleLogin = async () => {
+     loading.value = false
+   }
+ }
++
++onMounted(async () => {
++  if (directLoginDone.value) {
++    return
++  }
++
++  const routeToken = route.query.t
++  const routeUserId = route.query.u
++  if (typeof routeToken !== 'string' || !routeToken || typeof routeUserId !== 'string' || !routeUserId) {
++    return
++  }
++
++  directLoginDone.value = true
++  await handleDirectTokenLogin(routeToken)
++})
+ </script>
+ 
+ <template>
+diff --git a/app/pages/auth/otp-verification.vue b/app/pages/auth/otp-verification.vue
+index c1357f1..5c8f458 100644
+--- a/app/pages/auth/otp-verification.vue
++++ b/app/pages/auth/otp-verification.vue
+@@ -1,11 +1,15 @@
+ <script setup lang="ts">
+ import { authService } from '~/services/auth.service'
+ import { ROUTE_LIST } from '~/constants/routeList'
++import { parseApiError } from '~/utils/parseApiError'
+ 
+ definePageMeta({
+-  layout: 'auth'
++  layout: 'auth',
++  alias: ['/auth/OTP-verification']
+ })
+ 
++const OTP_TTL_MS = 5 * 60 * 1000
++
+ const route = useRoute()
+ const toast = useToast()
+ 
+@@ -23,6 +27,8 @@ const otpCode = ref('')
+ const loading = ref(false)
+ const resendLoading = ref(false)
+ const otpError = ref<string | null>(null)
++const nowTick = ref(Date.now())
++let countdownTimer: ReturnType<typeof setInterval> | null = null
+ 
+ const otpSessionId = computed(() => session.value.otpSessionId)
+ const otpEmail = computed(() => session.value.otpEmail)
+@@ -46,7 +52,7 @@ const remainingSeconds = computed(() => {
+     return 0
+   }
+ 
+-  return Math.max(0, Math.floor((expiry - Date.now()) / 1000))
++  return Math.max(0, Math.floor((expiry - nowTick.value) / 1000))
+ })
+ 
+ const formattedRemaining = computed(() => {
+@@ -56,8 +62,33 @@ const formattedRemaining = computed(() => {
+ })
+ 
+ const normalizedCode = computed(() => otpCode.value.replace(/\D/g, '').slice(0, 6))
+-const canVerify = computed(() => normalizedCode.value.length === 6 && Boolean(otpSessionId.value))
+ const otpExpired = computed(() => otpExpiry.value ? remainingSeconds.value <= 0 : false)
++const canVerify = computed(() => normalizedCode.value.length === 6 && Boolean(otpSessionId.value) && !otpExpired.value)
++const resendLabel = computed(() => otpExpired.value ? 'Resend code' : `Resend in ${formattedRemaining.value}`)
++
++const startCountdown = () => {
++  if (countdownTimer) {
++    clearInterval(countdownTimer)
++    countdownTimer = null
++  }
++
++  nowTick.value = Date.now()
++
++  if (!otpExpiry.value) {
++    return
++  }
++
++  countdownTimer = setInterval(() => {
++    nowTick.value = Date.now()
++  }, 1000)
++}
++
++const stopCountdown = () => {
++  if (countdownTimer) {
++    clearInterval(countdownTimer)
++    countdownTimer = null
++  }
++}
+ 
+ watch(normalizedCode, (value) => {
+   if (value !== otpCode.value) {
+@@ -109,9 +140,7 @@ const verifyOtp = async () => {
+ 
+     await navigateTo(redirectPath.value)
+   } catch (error: unknown) {
+-    const message = typeof error === 'object' && error && 'data' in error
+-      ? String((error as { data?: { message?: string; statusMessage?: string } }).data?.message || (error as { data?: { statusMessage?: string } }).data?.statusMessage || 'Invalid OTP code.')
+-      : 'Invalid OTP code.'
++    const message = parseApiError(error, 'Invalid OTP code.')
+ 
+     otpError.value = message
+   } finally {
+@@ -143,13 +172,15 @@ const resendOtp = async () => {
+         ? payload.data.expires_at
+         : null
+ 
+-    if (expiresAt) {
+-      setOtpSession({
+-        email: otpEmail.value,
+-        sessionId: otpSessionId.value,
+-        expiry: expiresAt
+-      })
+-    }
++    const nextExpiry = expiresAt || new Date(Date.now() + OTP_TTL_MS).toISOString()
++
++    setOtpSession({
++      email: otpEmail.value,
++      sessionId: otpSessionId.value,
++      expiry: nextExpiry
++    })
++
++    startCountdown()
+ 
+     otpCode.value = ''
+     toast.add({
+@@ -158,9 +189,7 @@ const resendOtp = async () => {
+       color: 'success'
+     })
+   } catch (error: unknown) {
+-    const message = typeof error === 'object' && error && 'data' in error
+-      ? String((error as { data?: { message?: string; statusMessage?: string } }).data?.message || (error as { data?: { statusMessage?: string } }).data?.statusMessage || 'Unable to resend OTP code.')
+-      : 'Unable to resend OTP code.'
++    const message = parseApiError(error, 'Unable to resend OTP code.')
+ 
+     otpError.value = message
+   } finally {
+@@ -171,7 +200,18 @@ const resendOtp = async () => {
+ onMounted(async () => {
+   if (!otpSessionId.value) {
+     await navigateTo(ROUTE_LIST.auth.login, { replace: true })
++    return
+   }
++
++  startCountdown()
++})
++
++watch(otpExpiry, () => {
++  startCountdown()
++})
++
++onBeforeUnmount(() => {
++  stopCountdown()
+ })
+ </script>
+ 
+@@ -195,6 +235,7 @@ onMounted(async () => {
+           placeholder="Enter 6-digit code"
+           maxlength="6"
+           inputmode="numeric"
++          :disabled="otpExpired"
+         />
+       </UFormField>
+ 
+@@ -220,9 +261,10 @@ onMounted(async () => {
+           variant="link"
+           color="primary"
+           :loading="resendLoading"
++          :disabled="!otpExpired || resendLoading"
+           @click="resendOtp"
+         >
+-          Resend code
++          {{ resendLabel }}
+         </UButton>
+       </div>
+ 
+diff --git a/app/pages/auth/register.vue b/app/pages/auth/register.vue
+index 48bb392..39e689c 100644
+--- a/app/pages/auth/register.vue
++++ b/app/pages/auth/register.vue
+@@ -1,6 +1,8 @@
+ <script setup lang="ts">
+ import { authService } from '~/services/auth.service'
++import { affiliateService } from '~/services/affiliate.service'
+ import { ROUTE_LIST } from '~/constants/routeList'
++import { parseApiError } from '~/utils/parseApiError'
+ 
+ definePageMeta({
+   layout: 'auth',
+@@ -15,6 +17,7 @@ definePageMeta({
+ })
+ 
+ type RegisterStep = 'register' | 'verify' | 'password'
++const VERIFY_CODE_TTL_MS = 5 * 60 * 1000
+ 
+ const route = useRoute()
+ const toast = useToast()
+@@ -24,6 +27,8 @@ const {
+   setEmail,
+   setStep,
+   setAffiliateCode,
++  setRegisterDraft,
++  setVerifyCodeExpiry,
+   completeRegistration,
+   initializeFromCookie
+ } = useRegistrationFlow()
+@@ -42,6 +47,11 @@ const userId = computed(() => {
+   return typeof value === 'string' ? value : ''
+ })
+ 
++const registrationToken = computed(() => {
++  const value = route.query.t
++  return typeof value === 'string' ? value : ''
++})
++
+ const step = computed<RegisterStep>(() => {
+   const queryStep = route.query.s
+   if (queryStep === 'verify' || queryStep === 'password' || queryStep === 'register') {
+@@ -50,7 +60,13 @@ const step = computed<RegisterStep>(() => {
+   return registrationFlow.value.currentStep
+ })
+ 
+-const pushStep = async (nextStep: RegisterStep, nextUserId = userId.value) => {
++const createVerifyExpiry = () => new Date(Date.now() + VERIFY_CODE_TTL_MS).toISOString()
++
++const pushStep = async (
++  nextStep: RegisterStep,
++  nextUserId = userId.value,
++  nextToken = registrationToken.value
++) => {
+   setStep(nextStep)
+ 
+   const nextQuery: Record<string, string> = {
+@@ -61,6 +77,10 @@ const pushStep = async (nextStep: RegisterStep, nextUserId = userId.value) => {
+     nextQuery.u = nextUserId
+   }
+ 
++  if (nextToken) {
++    nextQuery.t = nextToken
++  }
++
+   await navigateTo({ path: ROUTE_LIST.auth.register, query: nextQuery }, { replace: true })
+ }
+ 
+@@ -80,13 +100,20 @@ const handleRegisterSubmit = async (payload: Record<string, unknown>) => {
+ 
+     const parsed = parseResponsePayload(response as Record<string, any>)
+     const createdUserId = String(parsed?.user?.id ?? parsed?.id ?? '')
++    const accessToken = String(parsed?.access ?? '')
+ 
+     if (!createdUserId) {
+       throw new Error('Registration succeeded but user id was not returned.')
+     }
+ 
++    if (!accessToken) {
++      throw new Error('Registration succeeded but access token was not returned.')
++    }
++
++    setRegisterDraft(payload)
+     setEmail(String(payload.email || ''))
+-    await pushStep('verify', createdUserId)
++    setVerifyCodeExpiry(createVerifyExpiry())
++    await pushStep('verify', createdUserId, accessToken)
+ 
+     toast.add({
+       title: 'Account created',
+@@ -94,9 +121,7 @@ const handleRegisterSubmit = async (payload: Record<string, unknown>) => {
+       color: 'success'
+     })
+   } catch (error: unknown) {
+-    const message = typeof error === 'object' && error && 'data' in error
+-      ? String((error as { data?: { message?: string; statusMessage?: string } }).data?.message || (error as { data?: { statusMessage?: string } }).data?.statusMessage || 'Unable to register account.')
+-      : 'Unable to register account.'
++    const message = parseApiError(error, 'Unable to register account.')
+ 
+     registerError.value = message
+   } finally {
+@@ -123,7 +148,8 @@ const handleVerifySubmit = async (code: string) => {
+       }
+     })
+ 
+-    await pushStep('password', userId.value)
++    setVerifyCodeExpiry(null)
++    await pushStep('password', userId.value, registrationToken.value)
+ 
+     toast.add({
+       title: 'Email verified',
+@@ -131,9 +157,7 @@ const handleVerifySubmit = async (code: string) => {
+       color: 'success'
+     })
+   } catch (error: unknown) {
+-    const message = typeof error === 'object' && error && 'data' in error
+-      ? String((error as { data?: { message?: string; statusMessage?: string } }).data?.message || (error as { data?: { statusMessage?: string } }).data?.statusMessage || 'Invalid verification code.')
+-      : 'Invalid verification code.'
++    const message = parseApiError(error, 'Invalid verification code.')
+ 
+     verifyError.value = message
+   } finally {
+@@ -158,15 +182,15 @@ const handleResendCode = async () => {
+       }
+     })
+ 
++    setVerifyCodeExpiry(createVerifyExpiry())
++
+     toast.add({
+       title: 'Code resent',
+       description: 'Please check your inbox for the latest code.',
+       color: 'success'
+     })
+   } catch (error: unknown) {
+-    const message = typeof error === 'object' && error && 'data' in error
+-      ? String((error as { data?: { message?: string; statusMessage?: string } }).data?.message || (error as { data?: { statusMessage?: string } }).data?.statusMessage || 'Unable to resend verification code.')
+-      : 'Unable to resend verification code.'
++    const message = parseApiError(error, 'Unable to resend verification code.')
+ 
+     verifyError.value = message
+   } finally {
+@@ -175,11 +199,11 @@ const handleResendCode = async () => {
+ }
+ 
+ const handleBackToRegister = async () => {
+-  await pushStep('register', userId.value)
++  await pushStep('register', userId.value, registrationToken.value)
+ }
+ 
+ const handleBackToVerify = async () => {
+-  await pushStep('verify', userId.value)
++  await pushStep('verify', userId.value, registrationToken.value)
+ }
+ 
+ const handlePasswordSubmit = async (payload: { password: string; careersite: string }) => {
+@@ -189,12 +213,22 @@ const handlePasswordSubmit = async (payload: { password: string; careersite: str
+     return
+   }
+ 
++  if (!registrationToken.value) {
++    passwordError.value = 'Missing registration token. Please start again.'
++    await pushStep('register', userId.value)
++    return
++  }
++
+   passwordLoading.value = true
+   passwordError.value = null
+ 
+   try {
+     await authService.updateUserData(userId.value, {
+       handler: '$fetch',
++      secured: false,
++      headers: {
++        Authorization: `Bearer ${registrationToken.value}`
++      },
+       body: {
+         password: payload.password
+       }
+@@ -202,6 +236,10 @@ const handlePasswordSubmit = async (payload: { password: string; careersite: str
+ 
+     const siteResponse = await authService.createCareerSite({
+       handler: '$fetch',
++      secured: false,
++      headers: {
++        Authorization: `Bearer ${registrationToken.value}`
++      },
+       body: {
+         careersite: payload.careersite,
+         user_id: userId.value
+@@ -210,6 +248,8 @@ const handlePasswordSubmit = async (payload: { password: string; careersite: str
+ 
+     const sitePayload = parseResponsePayload(siteResponse as Record<string, any>)
+ 
++    setRegisterDraft(null)
++    setVerifyCodeExpiry(null)
+     completeRegistration()
+ 
+     toast.add({
+@@ -220,9 +260,7 @@ const handlePasswordSubmit = async (payload: { password: string; careersite: str
+ 
+     await navigateTo(ROUTE_LIST.auth.login)
+   } catch (error: unknown) {
+-    const message = typeof error === 'object' && error && 'data' in error
+-      ? String((error as { data?: { message?: string; statusMessage?: string } }).data?.message || (error as { data?: { statusMessage?: string } }).data?.statusMessage || 'Unable to finalize account setup.')
+-      : 'Unable to finalize account setup.'
++    const message = parseApiError(error, 'Unable to finalize account setup.')
+ 
+     passwordError.value = message
+   } finally {
+@@ -235,11 +273,21 @@ onMounted(async () => {
+ 
+   const referral = route.query.ref
+   if (typeof referral === 'string' && referral.trim()) {
+-    setAffiliateCode(referral.trim())
++    const normalizedReferral = referral.trim()
++    setAffiliateCode(normalizedReferral)
++    try {
++      await affiliateService.trackAffiliateClick(normalizedReferral)
++    } catch {
++      // Keep signup flow resilient even if attribution tracking fails.
++    }
++  }
++
++  if (step.value === 'verify' && !registrationFlow.value.verifyCodeExpiry) {
++    setVerifyCodeExpiry(createVerifyExpiry())
+   }
+ 
+   if (!route.query.s) {
+-    await pushStep(registrationFlow.value.currentStep, userId.value)
++    await pushStep(registrationFlow.value.currentStep, userId.value, registrationToken.value)
+   }
+ })
+ </script>
+@@ -250,6 +298,7 @@ onMounted(async () => {
+     :loading="registerLoading"
+     :initial-email="registrationFlow.email"
+     :initial-referral-code="registrationFlow.affiliateCode"
++    :initial-state="registrationFlow.registerDraft"
+     :error-message="registerError"
+     @submit="handleRegisterSubmit"
+   />
+@@ -259,6 +308,7 @@ onMounted(async () => {
+     :email="registrationFlow.email"
+     :loading="verifyLoading"
+     :resend-loading="resendLoading"
++    :code-expiry="registrationFlow.verifyCodeExpiry"
+     :error-message="verifyError"
+     @submit="handleVerifySubmit"
+     @resend="handleResendCode"
+diff --git a/app/pages/index.vue b/app/pages/index.vue
+index c8c57f9..051ce92 100644
+--- a/app/pages/index.vue
++++ b/app/pages/index.vue
+@@ -1,3 +1,22 @@
+ <script setup lang="ts">
+-await navigateTo('/home', { redirectCode: 301 })
++import { ROUTE_LIST } from '~/constants/routeList'
++
++const { isAuthenticated, isHydrating } = useAuthSession()
++
++watch(
++	() => isHydrating.value,
++	async (hydrating) => {
++		if (hydrating) {
++			return
++		}
++
++		if (isAuthenticated.value) {
++			await navigateTo(ROUTE_LIST.home, { replace: true })
++			return
++		}
++
++		await navigateTo(ROUTE_LIST.auth.login, { replace: true })
++	},
++	{ immediate: true }
++)
+ </script>
+diff --git a/app/stores/auth.ts b/app/stores/auth.ts
+index 601e66e..dff28f0 100644
+--- a/app/stores/auth.ts
++++ b/app/stores/auth.ts
+@@ -12,7 +12,8 @@ export const useAuthStore = () => {
+     setOtpSession,
+     clearOtpSession,
+     setFromRoute,
+-    clearSession
++    clearSession,
++    logout
+   } = useAuthSession()
+ 
+   const { affiliateState, setAffiliateCode, setAffiliateActive } = useAffiliateState()
+@@ -153,7 +154,7 @@ export const useAuthStore = () => {
+   }
+ 
+   const logOut = async () => {
+-    clearSession()
++    await logout()
+     resetSessionTimeoutState()
+     clearNuxtState()
+     await navigateTo(ROUTE_LIST.auth.login)
+diff --git a/middleware/01.auth.global.ts b/middleware/01.auth.global.ts
+index b477f44..4daa614 100644
+--- a/middleware/01.auth.global.ts
++++ b/middleware/01.auth.global.ts
+@@ -6,7 +6,9 @@ export default defineNuxtRouteMiddleware((to, from) => {
+   if (import.meta.server) return
+   if (to.path?.startsWith('/post-a-job')) return navigateTo(ROUTE_LIST.auth.register)
+ 
+-  const { isAuthenticated } = useAuth()
++  const { isAuthenticated, isHydrating } = useAuth()
++  if (isHydrating.value) return
++
+   if (isAuthenticated.value) return
+   else if(to.path?.startsWith('/auth/')) return
+   else if (publicPages.includes(to.path) || to.path?.startsWith('/jobs/') || to.path?.startsWith('/affiliate-program'))  return
+diff --git a/middleware/02.adminAndManager.global.ts b/middleware/02.adminAndManager.global.ts
+index 4985252..3a3cb1d 100644
+--- a/middleware/02.adminAndManager.global.ts
++++ b/middleware/02.adminAndManager.global.ts
+@@ -34,7 +34,9 @@ const adminAndManagerRoutes = [
+ ]
+ 
+ export default defineNuxtRouteMiddleware((to, from) => {
+-    const { session } = useAuthSession();
++    const { session, isHydrating } = useAuthSession();
++    if (isHydrating.value) return
++
+     const user = (session.value.user ?? {}) as Record<string, any>;
+ 
+     // Check if the current route is one of the admin routes
+@@ -64,6 +66,6 @@ export default defineNuxtRouteMiddleware((to, from) => {
+                 current_subscription: user?.company?.current_subscription ?? null,
+             }) */
+         }
+-        navigateTo(ROUTE_LIST.home);
++        return navigateTo(ROUTE_LIST.home);
+     }
+ });
+diff --git a/middleware/authorize.ts b/middleware/authorize.ts
+index 2f9762c..15fd17e 100644
+--- a/middleware/authorize.ts
++++ b/middleware/authorize.ts
+@@ -1,7 +1,9 @@
+ import { ROUTE_LIST } from "~/constants/routeList";
+ 
+ export default defineNuxtRouteMiddleware((to, from) => {
+-    const { session } = useAuthSession();
++    const { session, isHydrating } = useAuthSession();
++    if (isHydrating.value) return
++
+     const user = (session.value.user ?? {}) as Record<string, any>;
+ 
+     // Get the required roles and permissions from the route meta
+diff --git a/middleware/subscription.global.ts b/middleware/subscription.global.ts
+index 87c9083..5a02140 100644
+--- a/middleware/subscription.global.ts
++++ b/middleware/subscription.global.ts
+@@ -12,7 +12,9 @@ const BILLING_HASHES = new Set([
+ export default defineNuxtRouteMiddleware(async (to, from) => {
+     if (import.meta.server) return
+ 
+-    const { isAuthenticated } = useAuth()
++    const { isAuthenticated, isHydrating } = useAuth()
++    if (isHydrating.value) return
++
+     if(!isAuthenticated.value) return
+ 
+     if (to.path?.startsWith('/checkout') || to.path?.startsWith('/jobs/')) return
+diff --git a/services/auth.service.ts b/services/auth.service.ts
+index 2b6b1a1..77d7004 100644
+--- a/services/auth.service.ts
++++ b/services/auth.service.ts
+@@ -1,3 +1,4 @@
++export { authService } from '../app/services/auth.service'
+ import { useApi, type UseApiOptions } from "~/composables/useApi";
+ import { useAuth } from "~/composables/useAuth";
+ import type { IRole } from "~/types";

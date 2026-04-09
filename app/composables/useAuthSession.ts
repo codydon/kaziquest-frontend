@@ -1,6 +1,8 @@
 import type { AuthMethod, AuthSessionState, AuthUser } from '~/types'
 
 const AUTH_SESSION_STATE_KEY = 'kq-auth-session'
+const AUTH_SESSION_HYDRATED_KEY = 'kq-auth-session-hydrated'
+const AUTH_SESSION_HYDRATING_KEY = 'kq-auth-session-hydrating'
 const ACCESS_TOKEN_COOKIE = 'access'
 const REFRESH_TOKEN_COOKIE = 'refresh'
 
@@ -24,8 +26,11 @@ export interface AuthTokenPair {
 export const useAuthSession = () => {
   const config = useRuntimeConfig()
   const isSecureCookie = Boolean(config.public.apiBase?.startsWith('https://'))
+  const apiBase = useBaseUrl()
 
   const authSession = useState<AuthSessionState>(AUTH_SESSION_STATE_KEY, createDefaultAuthSessionState)
+  const isHydrating = useState<boolean>(AUTH_SESSION_HYDRATING_KEY, () => import.meta.client)
+  const hasHydrated = useState<boolean>(AUTH_SESSION_HYDRATED_KEY, () => import.meta.server)
 
   const accessToken = useCookie<string | null>(ACCESS_TOKEN_COOKIE, {
     path: '/',
@@ -92,10 +97,44 @@ export const useAuthSession = () => {
     authSession.value = createDefaultAuthSessionState()
   }
 
+  const beginHydration = () => {
+    isHydrating.value = true
+  }
+
+  const finishHydration = () => {
+    isHydrating.value = false
+    hasHydrated.value = true
+  }
+
+  const revokeRefreshToken = async (tokenToRevoke: string | null) => {
+    if (!tokenToRevoke) {
+      return
+    }
+
+    try {
+      await $fetch(`${apiBase}/accounts/logout/`, {
+        method: 'POST',
+        body: {
+          refresh_token: tokenToRevoke
+        }
+      })
+    } catch {
+      // Logout should still succeed locally even if the revocation API fails.
+    }
+  }
+
+  const logout = async () => {
+    const tokenToRevoke = refreshToken.value
+    clearSession()
+    await revokeRefreshToken(tokenToRevoke)
+  }
+
   return {
     session: readonly(authSession),
     token: readonly(effectiveAccessToken),
     refreshToken: readonly(effectiveRefreshToken),
+    isHydrating: readonly(isHydrating),
+    hasHydrated: readonly(hasHydrated),
     isAuthenticated,
     setAuthTokens,
     setUser,
@@ -104,6 +143,9 @@ export const useAuthSession = () => {
     clearOtpSession,
     setFromRoute,
     setRedirected,
-    clearSession
+    clearSession,
+    beginHydration,
+    finishHydration,
+    logout
   }
 }

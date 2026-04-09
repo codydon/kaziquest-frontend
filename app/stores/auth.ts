@@ -12,7 +12,8 @@ export const useAuthStore = () => {
     setOtpSession,
     clearOtpSession,
     setFromRoute,
-    clearSession
+    clearSession,
+    logout
   } = useAuthSession()
 
   const { affiliateState, setAffiliateCode, setAffiliateActive } = useAffiliateState()
@@ -153,7 +154,7 @@ export const useAuthStore = () => {
   }
 
   const logOut = async () => {
-    clearSession()
+    await logout()
     resetSessionTimeoutState()
     clearNuxtState()
     await navigateTo(ROUTE_LIST.auth.login)

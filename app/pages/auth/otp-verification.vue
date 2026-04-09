@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { authService } from '~/services/auth.service'
 import { ROUTE_LIST } from '~/constants/routeList'
+import { parseApiError } from '~/utils/parseApiError'
 
 definePageMeta({
-  layout: 'auth'
+  layout: 'auth',
+  alias: ['/auth/OTP-verification']
 })
+
+const OTP_TTL_MS = 5 * 60 * 1000
 
 const route = useRoute()
 const toast = useToast()
@@ -23,6 +27,8 @@ const otpCode = ref('')
 const loading = ref(false)
 const resendLoading = ref(false)
 const otpError = ref<string | null>(null)
+const nowTick = ref(Date.now())
+let countdownTimer: ReturnType<typeof setInterval> | null = null
 
 const otpSessionId = computed(() => session.value.otpSessionId)
 const otpEmail = computed(() => session.value.otpEmail)
@@ -46,7 +52,7 @@ const remainingSeconds = computed(() => {
     return 0
   }
 
-  return Math.max(0, Math.floor((expiry - Date.now()) / 1000))
+  return Math.max(0, Math.floor((expiry - nowTick.value) / 1000))
 })
 
 const formattedRemaining = computed(() => {
@@ -56,8 +62,33 @@ const formattedRemaining = computed(() => {
 })
 
 const normalizedCode = computed(() => otpCode.value.replace(/\D/g, '').slice(0, 6))
-const canVerify = computed(() => normalizedCode.value.length === 6 && Boolean(otpSessionId.value))
 const otpExpired = computed(() => otpExpiry.value ? remainingSeconds.value <= 0 : false)
+const canVerify = computed(() => normalizedCode.value.length === 6 && Boolean(otpSessionId.value) && !otpExpired.value)
+const resendLabel = computed(() => otpExpired.value ? 'Resend code' : `Resend in ${formattedRemaining.value}`)
+
+const startCountdown = () => {
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+
+  nowTick.value = Date.now()
+
+  if (!otpExpiry.value) {
+    return
+  }
+
+  countdownTimer = setInterval(() => {
+    nowTick.value = Date.now()
+  }, 1000)
+}
+
+const stopCountdown = () => {
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+}
 
 watch(normalizedCode, (value) => {
   if (value !== otpCode.value) {
@@ -109,9 +140,7 @@ const verifyOtp = async () => {
 
     await navigateTo(redirectPath.value)
   } catch (error: unknown) {
-    const message = typeof error === 'object' && error && 'data' in error
-      ? String((error as { data?: { message?: string; statusMessage?: string } }).data?.message || (error as { data?: { statusMessage?: string } }).data?.statusMessage || 'Invalid OTP code.')
-      : 'Invalid OTP code.'
+    const message = parseApiError(error, 'Invalid OTP code.')
 
     otpError.value = message
   } finally {
@@ -143,13 +172,15 @@ const resendOtp = async () => {
         ? payload.data.expires_at
         : null
 
-    if (expiresAt) {
-      setOtpSession({
-        email: otpEmail.value,
-        sessionId: otpSessionId.value,
-        expiry: expiresAt
-      })
-    }
+    const nextExpiry = expiresAt || new Date(Date.now() + OTP_TTL_MS).toISOString()
+
+    setOtpSession({
+      email: otpEmail.value,
+      sessionId: otpSessionId.value,
+      expiry: nextExpiry
+    })
+
+    startCountdown()
 
     otpCode.value = ''
     toast.add({
@@ -158,9 +189,7 @@ const resendOtp = async () => {
       color: 'success'
     })
   } catch (error: unknown) {
-    const message = typeof error === 'object' && error && 'data' in error
-      ? String((error as { data?: { message?: string; statusMessage?: string } }).data?.message || (error as { data?: { statusMessage?: string } }).data?.statusMessage || 'Unable to resend OTP code.')
-      : 'Unable to resend OTP code.'
+    const message = parseApiError(error, 'Unable to resend OTP code.')
 
     otpError.value = message
   } finally {
@@ -171,7 +200,18 @@ const resendOtp = async () => {
 onMounted(async () => {
   if (!otpSessionId.value) {
     await navigateTo(ROUTE_LIST.auth.login, { replace: true })
+    return
   }
+
+  startCountdown()
+})
+
+watch(otpExpiry, () => {
+  startCountdown()
+})
+
+onBeforeUnmount(() => {
+  stopCountdown()
 })
 </script>
 
@@ -195,6 +235,7 @@ onMounted(async () => {
           placeholder="Enter 6-digit code"
           maxlength="6"
           inputmode="numeric"
+          :disabled="otpExpired"
         />
       </UFormField>
 
@@ -220,9 +261,10 @@ onMounted(async () => {
           variant="link"
           color="primary"
           :loading="resendLoading"
+          :disabled="!otpExpired || resendLoading"
           @click="resendOtp"
         >
-          Resend code
+          {{ resendLabel }}
         </UButton>
       </div>
 

@@ -2,6 +2,7 @@
 import * as z from 'zod'
 import { authService } from '~/services/auth.service'
 import { ROUTE_LIST } from '~/constants/routeList'
+import { parseApiError } from '~/utils/parseApiError'
 
 definePageMeta({
   layout: 'auth',
@@ -37,6 +38,7 @@ const toast = useToast()
 
 const { setAuthTokens, setUser, setAuthMethod, setOtpSession } = useAuthSession()
 const { resetSessionTimeoutState } = useSessionTimeoutState()
+const directLoginDone = ref(false)
 
 const redirectPath = computed(() => {
   const redirect = route.query.redirect
@@ -45,6 +47,84 @@ const redirectPath = computed(() => {
   }
   return redirect
 })
+
+const removeTokenFromUrl = () => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  const url = new URL(window.location.href)
+  const keysToRemove = ['t', 'u', 'site_url']
+  let changed = false
+
+  for (const key of keysToRemove) {
+    if (url.searchParams.has(key)) {
+      url.searchParams.delete(key)
+      changed = true
+    }
+  }
+
+  if (changed) {
+    window.history.replaceState({}, '', url.toString())
+  }
+}
+
+const handleDirectTokenLogin = async (token: string) => {
+  loading.value = true
+  authError.value = null
+
+  try {
+    const response = await authService.fetchAuthUser({
+      handler: '$fetch',
+      secured: false,
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+
+    const payload = (response as Record<string, any>)?.data ?? (response as Record<string, any>)
+    const userData = (payload?.data ?? payload) as Record<string, any>
+
+    if (!userData || typeof userData !== 'object') {
+      throw new Error('Unable to authenticate with the provided token.')
+    }
+
+    const accessToken = typeof userData.access === 'string' && userData.access
+      ? userData.access
+      : token
+
+    setAuthTokens({
+      accessToken,
+      refreshToken: typeof userData.refresh === 'string' ? userData.refresh : null
+    })
+
+    const { access: _access, refresh: _refresh, ...user } = userData
+    setUser(user)
+    setAuthMethod('password')
+    resetSessionTimeoutState()
+    removeTokenFromUrl()
+
+    toast.add({
+      title: 'Welcome back',
+      description: 'Your account has been opened successfully.',
+      color: 'success'
+    })
+
+    await navigateTo(redirectPath.value)
+  } catch (error: unknown) {
+    const message = parseApiError(error, 'Direct login failed.')
+
+    authError.value = message
+
+    toast.add({
+      title: 'Unable to sign in',
+      description: message,
+      color: 'error'
+    })
+  } finally {
+    loading.value = false
+  }
+}
 
 const handleLogin = async () => {
   loading.value = true
@@ -108,9 +188,7 @@ const handleLogin = async () => {
 
     await navigateTo(redirectPath.value)
   } catch (error: unknown) {
-    const message = typeof error === 'object' && error && 'data' in error
-      ? String((error as { data?: { message?: string; statusMessage?: string } }).data?.message || (error as { data?: { statusMessage?: string } }).data?.statusMessage || 'Login failed.')
-      : 'Login failed.'
+    const message = parseApiError(error, 'Login failed.')
 
     authError.value = message
 
@@ -123,6 +201,21 @@ const handleLogin = async () => {
     loading.value = false
   }
 }
+
+onMounted(async () => {
+  if (directLoginDone.value) {
+    return
+  }
+
+  const routeToken = route.query.t
+  const routeUserId = route.query.u
+  if (typeof routeToken !== 'string' || !routeToken || typeof routeUserId !== 'string' || !routeUserId) {
+    return
+  }
+
+  directLoginDone.value = true
+  await handleDirectTokenLogin(routeToken)
+})
 </script>
 
 <template>

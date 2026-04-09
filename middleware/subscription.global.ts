@@ -12,7 +12,9 @@ const BILLING_HASHES = new Set([
 export default defineNuxtRouteMiddleware(async (to, from) => {
     if (import.meta.server) return
 
-    const { isAuthenticated } = useAuth()
+    const { isAuthenticated, isHydrating } = useAuth()
+    if (isHydrating.value) return
+
     if(!isAuthenticated.value) return
 
     if (to.path?.startsWith('/checkout') || to.path?.startsWith('/jobs/')) return

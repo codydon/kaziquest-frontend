@@ -34,7 +34,9 @@ const adminAndManagerRoutes = [
 ]
 
 export default defineNuxtRouteMiddleware((to, from) => {
-    const { session } = useAuthSession();
+    const { session, isHydrating } = useAuthSession();
+    if (isHydrating.value) return
+
     const user = (session.value.user ?? {}) as Record<string, any>;
 
     // Check if the current route is one of the admin routes
@@ -64,6 +66,6 @@ export default defineNuxtRouteMiddleware((to, from) => {
                 current_subscription: user?.company?.current_subscription ?? null,
             }) */
         }
-        navigateTo(ROUTE_LIST.home);
+        return navigateTo(ROUTE_LIST.home);
     }
 });

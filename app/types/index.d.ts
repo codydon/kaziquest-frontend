@@ -86,6 +86,8 @@ export interface RegistrationFlowState {
   email: string
   currentStep: RegistrationStep
   affiliateCode: string | null
+  registerDraft: Record<string, unknown> | null
+  verifyCodeExpiry: string | null
   isCompleted: boolean
 }
 

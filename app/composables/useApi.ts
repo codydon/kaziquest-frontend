@@ -83,7 +83,13 @@ export function useApi<T = any>(
   // const { buildHeaders } = useHeaders('app');
   // const { getBaseURL } = useBaseUrl();
   const toast = useToast();
-  const { clearSession } = useAuthSession();
+  const { clearSession, logout } = useAuthSession();
+  const refreshMetrics = useState('kq-auth-refresh-metrics', () => ({
+    attempts: 0,
+    successes: 0,
+    failures: 0,
+    retries: 0
+  }))
   
   const handler = options?.handler ?? 'useFetch'
   const secured = options?.secured ?? true
@@ -92,12 +98,15 @@ export function useApi<T = any>(
     if (refreshInFlight) return refreshInFlight
 
     refreshInFlight = (async () => {
+      refreshMetrics.value.attempts += 1
       try {
         const { useTokenRefresh } = await import("~/composables/useTokenRefresh")
         const { refreshToken } = useTokenRefresh()
         await refreshToken()
+        refreshMetrics.value.successes += 1
         return true
       } catch {
+        refreshMetrics.value.failures += 1
         return false
       } finally {
         refreshInFlight = null
@@ -110,7 +119,7 @@ export function useApi<T = any>(
   const logoutOnce = async () => {
     if (!logoutInFlight) {
       logoutInFlight = (async () => {
-        clearSession()
+        await logout()
         await navigateTo(ROUTE_LIST.auth.login)
       })().finally(() => {
         logoutInFlight = null
@@ -170,6 +179,7 @@ export function useApi<T = any>(
         const refreshed = await refreshAccessToken()
 
         if (refreshed) {
+          refreshMetrics.value.retries += 1
           const retryOptions = {
             ...requestMeta,
             _retryAfterRefresh: true,

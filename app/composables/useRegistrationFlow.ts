@@ -8,6 +8,8 @@ function createDefaultRegistrationState(): RegistrationFlowState {
     email: '',
     currentStep: 'register',
     affiliateCode: null,
+    registerDraft: null,
+    verifyCodeExpiry: null,
     isCompleted: false
   }
 }
@@ -35,8 +37,18 @@ export const useRegistrationFlow = () => {
     affiliateCodeCookie.value = code
   }
 
+  const setRegisterDraft = (draft: Record<string, unknown> | null) => {
+    registrationFlow.value.registerDraft = draft
+  }
+
+  const setVerifyCodeExpiry = (expiry: string | null) => {
+    registrationFlow.value.verifyCodeExpiry = expiry
+  }
+
   const completeRegistration = () => {
     registrationFlow.value.isCompleted = true
+    registrationFlow.value.registerDraft = null
+    registrationFlow.value.verifyCodeExpiry = null
     affiliateCodeCookie.value = null
   }
 
@@ -56,6 +68,8 @@ export const useRegistrationFlow = () => {
     setEmail,
     setStep,
     setAffiliateCode,
+    setRegisterDraft,
+    setVerifyCodeExpiry,
     completeRegistration,
     resetRegistration,
     initializeFromCookie

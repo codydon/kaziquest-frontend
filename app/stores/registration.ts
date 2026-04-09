@@ -4,6 +4,8 @@ export const useRegistrationStore = () => {
     setEmail,
     setStep,
     setAffiliateCode,
+    setRegisterDraft,
+    setVerifyCodeExpiry,
     completeRegistration,
     resetRegistration,
     initializeFromCookie
@@ -24,16 +26,30 @@ export const useRegistrationStore = () => {
     set: (value: string | null) => setAffiliateCode(value)
   })
 
+  const registerDraft = computed({
+    get: () => registrationFlow.value.registerDraft,
+    set: (value: Record<string, unknown> | null) => setRegisterDraft(value)
+  })
+
+  const verifyCodeExpiry = computed({
+    get: () => registrationFlow.value.verifyCodeExpiry,
+    set: (value: string | null) => setVerifyCodeExpiry(value)
+  })
+
   const isCompleted = computed(() => registrationFlow.value.isCompleted)
 
   return {
     email,
     currentStep,
     affiliateCode,
+    registerDraft,
+    verifyCodeExpiry,
     isCompleted,
     setEmail,
     setStep,
     setAffiliateCode,
+    setRegisterDraft,
+    setVerifyCodeExpiry,
     completeRegistration,
     resetRegistration,
     initializeFromCookie

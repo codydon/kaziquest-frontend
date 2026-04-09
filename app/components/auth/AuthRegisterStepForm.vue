@@ -6,6 +6,7 @@ const props = defineProps<{
   loading: boolean
   initialEmail?: string
   initialReferralCode?: string | null
+  initialState?: Record<string, unknown> | null
   errorMessage?: string | null
 }>()
 
@@ -48,14 +49,14 @@ const countryOptions = [
 ]
 
 const state = reactive<Partial<RegisterSchema>>({
-  first_name: '',
-  last_name: '',
-  email: props.initialEmail || '',
-  company_name: '',
-  title: '',
-  phone_number: '',
-  country: 'Kenya',
-  company_size: '1-10 employees'
+  first_name: String(props.initialState?.first_name || ''),
+  last_name: String(props.initialState?.last_name || ''),
+  email: String(props.initialState?.email || props.initialEmail || ''),
+  company_name: String(props.initialState?.company_name || ''),
+  title: String(props.initialState?.title || ''),
+  phone_number: String(props.initialState?.phone_number || ''),
+  country: String(props.initialState?.country || 'Kenya'),
+  company_size: String(props.initialState?.company_size || '1-10 employees')
 })
 
 const onSubmit = () => {

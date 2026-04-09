@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { authService } from '~/services/auth.service'
+import { affiliateService } from '~/services/affiliate.service'
 import { ROUTE_LIST } from '~/constants/routeList'
+import { parseApiError } from '~/utils/parseApiError'
 
 definePageMeta({
   layout: 'auth',
@@ -15,6 +17,7 @@ definePageMeta({
 })
 
 type RegisterStep = 'register' | 'verify' | 'password'
+const VERIFY_CODE_TTL_MS = 5 * 60 * 1000
 
 const route = useRoute()
 const toast = useToast()
@@ -24,6 +27,8 @@ const {
   setEmail,
   setStep,
   setAffiliateCode,
+  setRegisterDraft,
+  setVerifyCodeExpiry,
   completeRegistration,
   initializeFromCookie
 } = useRegistrationFlow()
@@ -42,6 +47,11 @@ const userId = computed(() => {
   return typeof value === 'string' ? value : ''
 })
 
+const registrationToken = computed(() => {
+  const value = route.query.t
+  return typeof value === 'string' ? value : ''
+})
+
 const step = computed<RegisterStep>(() => {
   const queryStep = route.query.s
   if (queryStep === 'verify' || queryStep === 'password' || queryStep === 'register') {
@@ -50,7 +60,13 @@ const step = computed<RegisterStep>(() => {
   return registrationFlow.value.currentStep
 })
 
-const pushStep = async (nextStep: RegisterStep, nextUserId = userId.value) => {
+const createVerifyExpiry = () => new Date(Date.now() + VERIFY_CODE_TTL_MS).toISOString()
+
+const pushStep = async (
+  nextStep: RegisterStep,
+  nextUserId = userId.value,
+  nextToken = registrationToken.value
+) => {
   setStep(nextStep)
 
   const nextQuery: Record<string, string> = {
@@ -59,6 +75,10 @@ const pushStep = async (nextStep: RegisterStep, nextUserId = userId.value) => {
 
   if (nextUserId) {
     nextQuery.u = nextUserId
+  }
+
+  if (nextToken) {
+    nextQuery.t = nextToken
   }
 
   await navigateTo({ path: ROUTE_LIST.auth.register, query: nextQuery }, { replace: true })
@@ -80,13 +100,20 @@ const handleRegisterSubmit = async (payload: Record<string, unknown>) => {
 
     const parsed = parseResponsePayload(response as Record<string, any>)
     const createdUserId = String(parsed?.user?.id ?? parsed?.id ?? '')
+    const accessToken = String(parsed?.access ?? '')
 
     if (!createdUserId) {
       throw new Error('Registration succeeded but user id was not returned.')
     }
 
+    if (!accessToken) {
+      throw new Error('Registration succeeded but access token was not returned.')
+    }
+
+    setRegisterDraft(payload)
     setEmail(String(payload.email || ''))
-    await pushStep('verify', createdUserId)
+    setVerifyCodeExpiry(createVerifyExpiry())
+    await pushStep('verify', createdUserId, accessToken)
 
     toast.add({
       title: 'Account created',
@@ -94,9 +121,7 @@ const handleRegisterSubmit = async (payload: Record<string, unknown>) => {
       color: 'success'
     })
   } catch (error: unknown) {
-    const message = typeof error === 'object' && error && 'data' in error
-      ? String((error as { data?: { message?: string; statusMessage?: string } }).data?.message || (error as { data?: { statusMessage?: string } }).data?.statusMessage || 'Unable to register account.')
-      : 'Unable to register account.'
+    const message = parseApiError(error, 'Unable to register account.')
 
     registerError.value = message
   } finally {
@@ -123,7 +148,8 @@ const handleVerifySubmit = async (code: string) => {
       }
     })
 
-    await pushStep('password', userId.value)
+    setVerifyCodeExpiry(null)
+    await pushStep('password', userId.value, registrationToken.value)
 
     toast.add({
       title: 'Email verified',
@@ -131,9 +157,7 @@ const handleVerifySubmit = async (code: string) => {
       color: 'success'
     })
   } catch (error: unknown) {
-    const message = typeof error === 'object' && error && 'data' in error
-      ? String((error as { data?: { message?: string; statusMessage?: string } }).data?.message || (error as { data?: { statusMessage?: string } }).data?.statusMessage || 'Invalid verification code.')
-      : 'Invalid verification code.'
+    const message = parseApiError(error, 'Invalid verification code.')
 
     verifyError.value = message
   } finally {
@@ -158,15 +182,15 @@ const handleResendCode = async () => {
       }
     })
 
+    setVerifyCodeExpiry(createVerifyExpiry())
+
     toast.add({
       title: 'Code resent',
       description: 'Please check your inbox for the latest code.',
       color: 'success'
     })
   } catch (error: unknown) {
-    const message = typeof error === 'object' && error && 'data' in error
-      ? String((error as { data?: { message?: string; statusMessage?: string } }).data?.message || (error as { data?: { statusMessage?: string } }).data?.statusMessage || 'Unable to resend verification code.')
-      : 'Unable to resend verification code.'
+    const message = parseApiError(error, 'Unable to resend verification code.')
 
     verifyError.value = message
   } finally {
@@ -175,11 +199,11 @@ const handleResendCode = async () => {
 }
 
 const handleBackToRegister = async () => {
-  await pushStep('register', userId.value)
+  await pushStep('register', userId.value, registrationToken.value)
 }
 
 const handleBackToVerify = async () => {
-  await pushStep('verify', userId.value)
+  await pushStep('verify', userId.value, registrationToken.value)
 }
 
 const handlePasswordSubmit = async (payload: { password: string; careersite: string }) => {
@@ -189,12 +213,22 @@ const handlePasswordSubmit = async (payload: { password: string; careersite: str
     return
   }
 
+  if (!registrationToken.value) {
+    passwordError.value = 'Missing registration token. Please start again.'
+    await pushStep('register', userId.value)
+    return
+  }
+
   passwordLoading.value = true
   passwordError.value = null
 
   try {
     await authService.updateUserData(userId.value, {
       handler: '$fetch',
+      secured: false,
+      headers: {
+        Authorization: `Bearer ${registrationToken.value}`
+      },
       body: {
         password: payload.password
       }
@@ -202,6 +236,10 @@ const handlePasswordSubmit = async (payload: { password: string; careersite: str
 
     const siteResponse = await authService.createCareerSite({
       handler: '$fetch',
+      secured: false,
+      headers: {
+        Authorization: `Bearer ${registrationToken.value}`
+      },
       body: {
         careersite: payload.careersite,
         user_id: userId.value
@@ -210,6 +248,8 @@ const handlePasswordSubmit = async (payload: { password: string; careersite: str
 
     const sitePayload = parseResponsePayload(siteResponse as Record<string, any>)
 
+    setRegisterDraft(null)
+    setVerifyCodeExpiry(null)
     completeRegistration()
 
     toast.add({
@@ -220,9 +260,7 @@ const handlePasswordSubmit = async (payload: { password: string; careersite: str
 
     await navigateTo(ROUTE_LIST.auth.login)
   } catch (error: unknown) {
-    const message = typeof error === 'object' && error && 'data' in error
-      ? String((error as { data?: { message?: string; statusMessage?: string } }).data?.message || (error as { data?: { statusMessage?: string } }).data?.statusMessage || 'Unable to finalize account setup.')
-      : 'Unable to finalize account setup.'
+    const message = parseApiError(error, 'Unable to finalize account setup.')
 
     passwordError.value = message
   } finally {
@@ -235,11 +273,21 @@ onMounted(async () => {
 
   const referral = route.query.ref
   if (typeof referral === 'string' && referral.trim()) {
-    setAffiliateCode(referral.trim())
+    const normalizedReferral = referral.trim()
+    setAffiliateCode(normalizedReferral)
+    try {
+      await affiliateService.trackAffiliateClick(normalizedReferral)
+    } catch {
+      // Keep signup flow resilient even if attribution tracking fails.
+    }
+  }
+
+  if (step.value === 'verify' && !registrationFlow.value.verifyCodeExpiry) {
+    setVerifyCodeExpiry(createVerifyExpiry())
   }
 
   if (!route.query.s) {
-    await pushStep(registrationFlow.value.currentStep, userId.value)
+    await pushStep(registrationFlow.value.currentStep, userId.value, registrationToken.value)
   }
 })
 </script>
@@ -250,6 +298,7 @@ onMounted(async () => {
     :loading="registerLoading"
     :initial-email="registrationFlow.email"
     :initial-referral-code="registrationFlow.affiliateCode"
+    :initial-state="registrationFlow.registerDraft"
     :error-message="registerError"
     @submit="handleRegisterSubmit"
   />
@@ -259,6 +308,7 @@ onMounted(async () => {
     :email="registrationFlow.email"
     :loading="verifyLoading"
     :resend-loading="resendLoading"
+    :code-expiry="registrationFlow.verifyCodeExpiry"
     :error-message="verifyError"
     @submit="handleVerifySubmit"
     @resend="handleResendCode"
