@@ -4,6 +4,18 @@
 @theme static {
   --font-sans: 'Public Sans', sans-serif;
 
+  --color-kaziquest-50: #ECF6FF;
+  --color-kaziquest-100: #D4E9FF;
+  --color-kaziquest-200: #B3D7FE;
+  --color-kaziquest-300: #7EC0FE;
+  --color-kaziquest-400: #429DFD;
+  --color-kaziquest-500: #0D6EFD;
+  --color-kaziquest-600: #044FEA;
+  --color-kaziquest-700: #044FEA;
+  --color-kaziquest-800: #1136A6;
+  --color-kaziquest-900: #133284;
+  --color-kaziquest-950: #102050;
+
   --color-green-50: #EFFDF5;
   --color-green-100: #D9FBE8;
   --color-green-200: #B3F5D1;

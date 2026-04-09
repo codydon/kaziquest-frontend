@@ -28,7 +28,21 @@ jobs:
         run: pnpm install
 
       - name: Lint
-        run: pnpm run lint
+        run: pnpm run lint:strict
+
+      - name: Policy Guardrails
+        run: |
+          if grep -RIn --include='*.vue' '<table[[:space:]>]' app; then
+            echo 'Manual HTML <table> markup detected. Use Nuxt UI UTable instead.'
+            exit 1
+          fi
+
+          invalid_layouts=$(grep -RIn --include='*.vue' "layout:[[:space:]]*'" app/pages | grep -vE "layout:[[:space:]]*'(default|public)'" || true)
+          if [ -n "$invalid_layouts" ]; then
+            echo 'Unsupported layout name detected. Allowed layouts: default, public.'
+            echo "$invalid_layouts"
+            exit 1
+          fi
 
       - name: Typecheck
         run: pnpm run typecheck

@@ -35,6 +35,32 @@ Make sure to install the dependencies:
 pnpm install
 ```
 
+## Environment Setup
+
+Create your local environment file from the example:
+
+```bash
+cp .env.example .env
+```
+
+This project follows Nuxt runtime config naming conventions.
+
+Public runtime variables:
+- `NUXT_PUBLIC_SITE_URL`
+- `NUXT_PUBLIC_CURRENT_ENVIRONMENT`
+- `NUXT_PUBLIC_API_BASE`
+- `NUXT_PUBLIC_MAIN_APP_URL`
+- `NUXT_PUBLIC_EXCLUDED_SUBDOMAINS`
+- `NUXT_PUBLIC_USE_MOCK_PAYMENTS`
+- `NUXT_PUBLIC_SENTRY_DSN` (optional)
+
+Server-only runtime variables:
+- `NUXT_API_SECRET`
+
+Legacy migration compatibility:
+- `BACKEND_URL`, `MAIN_APP_URL`, `EXCLUDED_SUBDOMAINS`, and `SENTRY_DSN` are still accepted as fallbacks during migration.
+- Prefer the `NUXT_*` variable names for all new environments and CI pipelines.
+
 ## Development Server
 
 Start the development server on `http://localhost:3000`:
