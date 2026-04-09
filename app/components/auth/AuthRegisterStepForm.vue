@@ -66,6 +66,10 @@ const onSubmit = () => {
     referred_by: props.initialReferralCode || undefined
   })
 }
+
+const inputUi = {
+  base: 'placeholder:text-slate-400 dark:placeholder:text-slate-500'
+}
 </script>
 
 <template>
@@ -73,46 +77,43 @@ const onSubmit = () => {
     title="Create your workspace"
     description="Get started in under two minutes. You can refine details after setup."
   >
-    <UForm :schema="schema" :state="state" class="space-y-3 [@media(max-height:820px)]:space-y-2" @submit="onSubmit">
-      <div class="rounded-lg border border-cyan-200/70 bg-cyan-50 px-3 py-2 text-xs text-cyan-700 [@media(max-height:820px)]:hidden">
-        Your account starts with secure defaults and guided onboarding.
-      </div>
+    <UForm :schema="schema" :state="state" class="space-y-4 sm:space-y-5" @submit="onSubmit">
 
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <UFormField name="first_name" label="First name">
-          <UInput v-model="state.first_name" placeholder="First name" class="w-full" />
+          <UInput v-model="state.first_name" size="lg" placeholder="First name" class="w-full min-w-0" :ui="inputUi" />
         </UFormField>
 
         <UFormField name="last_name" label="Last name">
-          <UInput v-model="state.last_name" placeholder="Last name" class="w-full" />
+          <UInput v-model="state.last_name" size="lg" placeholder="Last name" class="w-full min-w-0" :ui="inputUi" />
         </UFormField>
       </div>
 
       <UFormField name="email" label="Business email">
-        <UInput v-model="state.email" type="email" placeholder="you@company.com" class="w-full" />
+        <UInput v-model="state.email" size="lg" type="email" placeholder="you@company.com" class="w-full min-w-0" :ui="inputUi" />
       </UFormField>
 
       <UFormField name="company_name" label="Company name">
-        <UInput v-model="state.company_name" placeholder="Company name" class="w-full" />
+        <UInput v-model="state.company_name" size="lg" placeholder="Company name" class="w-full min-w-0" :ui="inputUi" />
       </UFormField>
 
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <UFormField name="title" label="Job title">
-          <UInput v-model="state.title" placeholder="HR Manager" class="w-full" />
+          <UInput v-model="state.title" size="lg" placeholder="HR Manager" class="w-full min-w-0" :ui="inputUi" />
         </UFormField>
 
         <UFormField name="phone_number" label="Phone number">
-          <UInput v-model="state.phone_number" placeholder="+254 700 000 000" class="w-full" />
+          <UInput v-model="state.phone_number" size="lg" placeholder="+254 700 000 000" class="w-full min-w-0" :ui="inputUi" />
         </UFormField>
       </div>
 
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <UFormField name="country" label="Country">
-          <USelect v-model="state.country" :items="countryOptions" placeholder="Select country" class="w-full" />
+          <USelect v-model="state.country" size="lg" :items="countryOptions" placeholder="Select country" class="w-full min-w-0" :ui="inputUi" />
         </UFormField>
 
         <UFormField name="company_size" label="Company size">
-          <USelect v-model="state.company_size" :items="companySizeOptions" placeholder="Select company size" class="w-full" />
+          <USelect v-model="state.company_size" size="lg" :items="companySizeOptions" placeholder="Select company size" class="w-full min-w-0" :ui="inputUi" />
         </UFormField>
       </div>
 
@@ -124,6 +125,10 @@ const onSubmit = () => {
         :title="props.errorMessage"
       />
 
+      <UButton type="submit" block :loading="props.loading">
+        Continue
+      </UButton>
+
       <div class="flex items-center justify-between gap-3">
         <NuxtLink class="text-sm text-primary hover:underline" :to="ROUTE_LIST.auth.login">
           Already registered? Sign in
@@ -133,10 +138,7 @@ const onSubmit = () => {
           Forgot password?
         </NuxtLink>
       </div>
-
-      <UButton type="submit" block :loading="props.loading">
-        Continue
-      </UButton>
+      
     </UForm>
   </AuthFormShell>
 </template>

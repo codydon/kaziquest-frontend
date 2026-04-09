@@ -4,9 +4,9 @@ const route = useRoute()
 const isAuthRoute = computed(() => route.path.startsWith('/auth/'))
 
 const heroCopy = {
-  eyebrow: 'KaziQuest operating system for people teams',
-  title: 'Hiring, payroll, and people changes on one shared desk',
-  description: 'Move from vacancy to offer, from attendance to payout, and from onboarding to records without bouncing between tools.',
+  eyebrow: 'Simplify HR and Payroll. Empower Your Business.',
+  title: 'Streamline HR And Payroll,\nA Smarter, Simpler Solution',
+  description: 'Manage payroll, time-off, benefits, recruiting and employee data effortlessly—all in one place, from any device.',
   highlights: [
     'Every approval, handoff, and status change in one place',
     'Payroll runs stay clean because records stay current',
@@ -16,8 +16,8 @@ const heroCopy = {
 </script>
 
 <template>
-  <div v-if="isAuthRoute" class="h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,#f6f0e6_0%,#f4f6f8_38%,#e7edf5_100%)] text-default">
-    <div class="grid h-screen w-full md:grid-cols-[1.1fr_0.9fr]">
+  <div v-if="isAuthRoute" class="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top_left,#f6f0e6_0%,#f4f6f8_38%,#e7edf5_100%)] text-default xl:h-screen xl:overflow-hidden">
+    <div class="grid min-h-screen w-full xl:grid-cols-2">
       <AuthHeroPanel
         :eyebrow="heroCopy.eyebrow"
         :title="heroCopy.title"
@@ -25,16 +25,17 @@ const heroCopy = {
         :highlights="heroCopy.highlights"
       />
 
-      <main class="relative flex h-screen items-center justify-center overflow-y-auto bg-[linear-gradient(180deg,#fbfbfa_0%,#f1f4f7_100%)] px-4 py-5 sm:px-6 lg:px-8 [@media(max-height:820px)]:py-3">
-        <div class="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top,rgba(13,110,253,0.08),transparent_68%)]" />
-        <div class="w-full max-w-lg">
+      <main id="auth-form-anchor" class="relative flex min-h-[56vh] items-start justify-center overflow-y-auto bg-white px-5 pb-6 pt-16 sm:px-8 sm:pb-8 sm:pt-16 lg:px-10 lg:pb-10 lg:pt-16 xl:h-screen xl:min-h-0 dark:bg-slate-950">
+        <div class="flex min-h-full w-full max-w-xl flex-col py-1">
           <slot />
 
-          <div class="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-slate-500 [@media(max-height:820px)]:hidden">
-            <span>2026 KaziQuest</span>
-            <NuxtLink to="/support" class="transition hover:text-slate-700">Support</NuxtLink>
-            <span>Privacy</span>
-            <span>Terms</span>
+          <div class="mt-auto border-t border-slate-200 pt-3 dark:border-white/10">
+            <div class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-slate-500 sm:text-[11px] lg:text-xs dark:text-slate-300">
+              <span>2026 KaziQuest</span>
+              <NuxtLink to="/support" class="transition hover:text-slate-800 dark:hover:text-white">Support</NuxtLink>
+              <span>Privacy</span>
+              <span>Terms</span>
+            </div>
           </div>
         </div>
       </main>
