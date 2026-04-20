@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
 
-const toast = useToast()
-
 const open = ref(false)
 
 const links = [[{
@@ -13,9 +11,9 @@ const links = [[{
     open.value = false
   }
 }, {
-  label: 'People',
+  label: 'Employees',
   icon: 'i-lucide-users',
-  to: '/people',
+  to: '/employees',
   onSelect: () => {
     open.value = false
   }
@@ -37,8 +35,8 @@ const links = [[{
       open.value = false
     }
   }, {
-    label: 'Policies',
-    to: '/time-off/policies',
+    label: 'Settings',
+    to: '/settings#timeoffs',
     onSelect: () => {
       open.value = false
     }
@@ -49,13 +47,25 @@ const links = [[{
   type: 'trigger',
   children: [{
     label: 'Run Payroll',
-    to: '/payroll/run',
+    to: '/payroll',
     onSelect: () => {
       open.value = false
     }
   }, {
     label: 'History',
     to: '/payroll/history',
+    onSelect: () => {
+      open.value = false
+    }
+  }, {
+    label: 'Wallet',
+    to: '/payroll/wallet-balance',
+    onSelect: () => {
+      open.value = false
+    }
+  }, {
+    label: 'Off-cycle',
+    to: '/payroll/off-cycle',
     onSelect: () => {
       open.value = false
     }
@@ -160,31 +170,6 @@ const groups = computed(() => [{
   label: 'Go to',
   items: links.flat()
 }])
-
-onMounted(async () => {
-  const cookie = useCookie('cookie-consent')
-  if (cookie.value === 'accepted') {
-    return
-  }
-
-  toast.add({
-    title: 'We use first-party cookies to enhance your experience on our website.',
-    duration: 0,
-    close: false,
-    actions: [{
-      label: 'Accept',
-      color: 'neutral',
-      variant: 'outline',
-      onClick: () => {
-        cookie.value = 'accepted'
-      }
-    }, {
-      label: 'Opt out',
-      color: 'neutral',
-      variant: 'ghost'
-    }]
-  })
-})
 </script>
 
 <template>
@@ -205,6 +190,7 @@ onMounted(async () => {
         <UDashboardSearchButton :collapsed="collapsed" class="bg-transparent ring-default" />
 
         <UNavigationMenu
+          type="single"
           :collapsed="collapsed"
           :items="links[0]"
           orientation="vertical"

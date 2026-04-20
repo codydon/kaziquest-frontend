@@ -3,15 +3,22 @@ import * as z from 'zod'
 import { authService } from '~/services/auth.service'
 import { ROUTE_LIST } from '~/constants/routeList'
 import { parseApiError } from '~/utils/parseApiError'
+import { getSubdomainFromHref, parseExcludedSubdomains } from '~/utils/subdomain'
 
 definePageMeta({
   layout: 'auth',
   middleware: [
-    () => {
+    (to) => {
       const { isAuthenticated } = useAuthSession()
-      if (isAuthenticated.value) {
-        return navigateTo(ROUTE_LIST.home)
+      if (!isAuthenticated.value) {
+        return
       }
+      const raw = to.query.redirect
+      const redirectTarget = typeof raw === 'string' && raw.startsWith('/') ? raw : null
+      if (redirectTarget) {
+        return navigateTo(redirectTarget)
+      }
+      return navigateTo(ROUTE_LIST.home)
     }
   ]
 })
@@ -35,6 +42,16 @@ const rememberDevice = ref(true)
 
 const route = useRoute()
 const toast = useToast()
+const runtimeConfig = useRuntimeConfig()
+const requestUrl = useRequestURL()
+
+const subdomain = computed(() => getSubdomainFromHref(requestUrl.href))
+const excludedSubdomains = computed(() =>
+  parseExcludedSubdomains(String(runtimeConfig.public.excludedSubdomains ?? ''))
+)
+const needsSubdomain = computed(
+  () => !subdomain.value || excludedSubdomains.value.includes(subdomain.value)
+)
 
 const { setAuthTokens, setUser, setAuthMethod, setOtpSession } = useAuthSession()
 const { resetSessionTimeoutState } = useSessionTimeoutState()
@@ -219,13 +236,22 @@ onMounted(async () => {
 </script>
 
 <template>
+  <AuthEnterSubdomain v-if="needsSubdomain" />
+
   <AuthFormShell
+    v-else
     title="Sign in"
     description="Use your work account to continue."
   >
     <UForm :schema="loginSchema" :state="state" class="space-y-4" @submit="handleLogin">
       <UFormField name="email" label="Email">
-        <UInput v-model="state.email" type="email" class="w-full" placeholder="you@company.com" />
+        <UInput
+          v-model="state.email"
+          type="email"
+          class="w-full"
+          placeholder="you@company.com"
+          autocomplete="username"
+        />
       </UFormField>
 
       <UFormField name="password" label="Password">
@@ -234,6 +260,7 @@ onMounted(async () => {
           :type="showPassword ? 'text' : 'password'"
           class="w-full"
           placeholder="Enter your password"
+          autocomplete="current-password"
           :ui="{ trailing: 'pe-1' }"
         >
           <template #trailing>
@@ -265,7 +292,7 @@ onMounted(async () => {
       </div>
 
       <div class="flex items-center justify-between gap-3">
-        <span class="text-xs text-gray-500">Need a workspace account?</span>
+        <span class="text-xs text-gray-500">Need a KaziQuest Workspace?</span>
         <NuxtLink class="text-sm text-primary hover:underline" :to="ROUTE_LIST.auth.register">
           Create account
         </NuxtLink>

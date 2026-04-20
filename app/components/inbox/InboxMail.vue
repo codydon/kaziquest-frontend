@@ -47,39 +47,38 @@ function onSubmit() {
 
 <template>
   <UDashboardPanel id="inbox-2">
-    <UDashboardNavbar :title="mail.subject" :toggle="false">
-      <template #leading>
-        <UButton
-          icon="i-lucide-x"
-          color="neutral"
-          variant="ghost"
-          class="-ms-1.5"
-          @click="emits('close')"
-        />
-      </template>
+    <template #header>
+      <DashboardPageHeader
+        :title="mail.subject"
+        breadcrumb="Dashboard / Inbox"
+        :on-back="() => emits('close')"
+        :show-sidebar-toggle="false"
+      >
+        <template #right>
+          <UTooltip text="Archive">
+            <UButton
+              icon="i-lucide-inbox"
+              color="neutral"
+              variant="ghost"
+            />
+          </UTooltip>
 
-      <template #right>
-        <UTooltip text="Archive">
-          <UButton
-            icon="i-lucide-inbox"
-            color="neutral"
-            variant="ghost"
-          />
-        </UTooltip>
+          <UTooltip text="Reply">
+            <UButton icon="i-lucide-reply" color="neutral" variant="ghost" />
+          </UTooltip>
 
-        <UTooltip text="Reply">
-          <UButton icon="i-lucide-reply" color="neutral" variant="ghost" />
-        </UTooltip>
+          <UDropdownMenu :items="dropdownItems">
+            <UButton
+              icon="i-lucide-ellipsis-vertical"
+              color="neutral"
+              variant="ghost"
+            />
+          </UDropdownMenu>
 
-        <UDropdownMenu :items="dropdownItems">
-          <UButton
-            icon="i-lucide-ellipsis-vertical"
-            color="neutral"
-            variant="ghost"
-          />
-        </UDropdownMenu>
-      </template>
-    </UDashboardNavbar>
+          <UserMenu avatar-only class="shrink-0" />
+        </template>
+      </DashboardPageHeader>
+    </template>
 
     <div class="flex flex-col sm:flex-row justify-between gap-1 p-4 sm:px-6 border-b border-default">
       <div class="flex items-start gap-4 sm:my-1.5">

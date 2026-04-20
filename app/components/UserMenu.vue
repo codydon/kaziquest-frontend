@@ -1,38 +1,75 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
+import { ROUTE_LIST } from '~/constants/routeList'
 
-defineProps<{
+const props = defineProps<{
+  /** Sidebar collapsed: compact trigger + narrow menu. */
   collapsed?: boolean
+  /** Navbar / toolbar: avatar only (no name), does not stretch full width. */
+  avatarOnly?: boolean
 }>()
+
+const compactTrigger = computed(() => Boolean(props.collapsed || props.avatarOnly))
 
 const colorMode = useColorMode()
 const appConfig = useAppConfig()
 
-const colors = ['red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose']
-const neutrals = ['slate', 'gray', 'zinc', 'neutral', 'stone']
+const colors = ['kaziquest', 'red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose'] as const
+const neutrals = ['slate', 'gray', 'zinc', 'neutral', 'stone'] as const
 
-const user = ref({
-  name: 'Benjamin Canac',
-  avatar: {
-    src: 'https://github.com/benjamincanac.png',
-    alt: 'Benjamin Canac'
+const toast = useToast()
+const { logout } = useAuthSession()
+
+const logoutLoading = ref(false)
+const logoutConfirmOpen = ref(false)
+
+const menuUser = useUserAvatarModel()
+
+const openLogoutConfirm = (e: Event) => {
+  e.preventDefault()
+  logoutConfirmOpen.value = true
+}
+
+const performLogout = async () => {
+  if (logoutLoading.value) {
+    return
   }
-})
+
+  logoutLoading.value = true
+  try {
+    await logout()
+    logoutConfirmOpen.value = false
+    toast.add({
+      title: 'Signed out',
+      description: 'You have been logged out successfully.',
+      color: 'success'
+    })
+    await navigateTo(ROUTE_LIST.auth.login)
+  } catch {
+    logoutConfirmOpen.value = false
+    toast.add({
+      title: 'Sign out failed',
+      description: 'You were signed out locally. Try again if something still looks wrong.',
+      color: 'warning'
+    })
+    await navigateTo(ROUTE_LIST.auth.login)
+  } finally {
+    logoutLoading.value = false
+  }
+}
 
 const items = computed<DropdownMenuItem[][]>(() => ([[{
   type: 'label',
-  label: user.value.name,
-  avatar: user.value.avatar
+  label: menuUser.value.name,
+  avatar: menuUser.value.avatar
 }], [{
   label: 'Profile',
-  icon: 'i-lucide-user'
-}, {
-  label: 'Billing',
-  icon: 'i-lucide-credit-card'
+  icon: 'i-lucide-user',
+  to: ROUTE_LIST.profile
 }, {
   label: 'Settings',
   icon: 'i-lucide-settings',
-  to: '/settings'
+  to: '/settings/company'
 }], [{
   label: 'Theme',
   icon: 'i-lucide-palette',
@@ -45,7 +82,7 @@ const items = computed<DropdownMenuItem[][]>(() => ([[{
       collisionPadding: 16
     },
     children: colors.map(color => ({
-      label: color,
+      label: color === 'kaziquest' ? 'KaziQuest' : color,
       chip: color,
       slot: 'chip',
       checked: appConfig.ui.colors.primary === color,
@@ -104,70 +141,60 @@ const items = computed<DropdownMenuItem[][]>(() => ([[{
       e.preventDefault()
     }
   }]
-}], [{
-  label: 'Templates',
-  icon: 'i-lucide-layout-template',
-  children: [{
-    label: 'Starter',
-    to: 'https://starter-template.nuxt.dev/'
-  }, {
-    label: 'Landing',
-    to: 'https://landing-template.nuxt.dev/'
-  }, {
-    label: 'Docs',
-    to: 'https://docs-template.nuxt.dev/'
-  }, {
-    label: 'SaaS',
-    to: 'https://saas-template.nuxt.dev/'
-  }, {
-    label: 'Dashboard',
-    to: 'https://dashboard-template.nuxt.dev/',
-    color: 'primary',
-    checked: true,
-    type: 'checkbox'
-  }, {
-    label: 'Chat',
-    to: 'https://chat-template.nuxt.dev/'
-  }, {
-    label: 'Portfolio',
-    to: 'https://portfolio-template.nuxt.dev/'
-  }, {
-    label: 'Changelog',
-    to: 'https://changelog-template.nuxt.dev/'
-  }]
-}], [{
+}], [/* {
   label: 'Documentation',
   icon: 'i-lucide-book-open',
   to: 'https://ui.nuxt.com/docs/getting-started/installation/nuxt',
   target: '_blank'
-}, {
-  label: 'GitHub repository',
-  icon: 'i-simple-icons-github',
-  to: 'https://github.com/nuxt-ui-templates/dashboard',
-  target: '_blank'
-}, {
-  label: 'Log out',
-  icon: 'i-lucide-log-out'
-}]]))
+}, */{
+    label: 'Log out',
+    icon: 'i-lucide-log-out',
+    onSelect: (e: Event) => {
+      openLogoutConfirm(e)
+    }
+  }]]))
 </script>
 
 <template>
+  <UModal
+    v-model:open="logoutConfirmOpen"
+    title="Sign out?"
+    description="You will need to sign in again to access your workspace."
+  >
+    <template #footer>
+      <div class="flex w-full items-center justify-end gap-2">
+        <UButton
+          label="Cancel"
+          color="neutral"
+          variant="outline"
+          :disabled="logoutLoading"
+          @click="logoutConfirmOpen = false"
+        />
+        <UButton
+          label="Sign out"
+          color="error"
+          :loading="logoutLoading"
+          @click="() => void performLogout()"
+        />
+      </div>
+    </template>
+  </UModal>
+
   <UDropdownMenu
     :items="items"
     :content="{ align: 'center', collisionPadding: 12 }"
-    :ui="{ content: collapsed ? 'w-48' : 'w-(--reka-dropdown-menu-trigger-width)' }"
+    :ui="{ content: compactTrigger ? 'w-48' : 'w-(--reka-dropdown-menu-trigger-width)' }"
   >
     <UButton
-      v-bind="{
-        ...user,
-        label: collapsed ? undefined : user?.name,
-        trailingIcon: collapsed ? undefined : 'i-lucide-chevrons-up-down'
-      }"
+      :avatar="menuUser.avatar"
+      :label="compactTrigger ? undefined : menuUser.name"
+      :trailing-icon="compactTrigger ? undefined : 'i-lucide-chevrons-up-down'"
       color="neutral"
       variant="ghost"
-      block
-      :square="collapsed"
+      :block="!props.avatarOnly"
+      :square="compactTrigger"
       class="data-[state=open]:bg-elevated"
+      :class="[!compactTrigger && 'py-2']"
       :ui="{
         trailingIcon: 'text-dimmed'
       }"

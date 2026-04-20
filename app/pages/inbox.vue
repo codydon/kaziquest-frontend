@@ -55,23 +55,25 @@ const isMobile = breakpoints.smaller('lg')
     :max-size="30"
     resizable
   >
-    <UDashboardNavbar title="Inbox">
-      <template #leading>
-        <UDashboardSidebarCollapse />
-      </template>
-      <template #trailing>
-        <UBadge :label="filteredMails.length" variant="subtle" />
-      </template>
-
-      <template #right>
-        <UTabs
-          v-model="selectedTab"
-          :items="tabItems"
-          :content="false"
-          size="xs"
-        />
-      </template>
-    </UDashboardNavbar>
+    <template #header>
+      <DashboardPageHeader
+        title="Inbox"
+        breadcrumb="Dashboard / Inbox"
+      >
+        <template #trailing>
+          <UBadge :label="filteredMails.length" variant="subtle" />
+        </template>
+        <template #right>
+          <UTabs
+            v-model="selectedTab"
+            :items="tabItems"
+            :content="false"
+            size="xs"
+          />
+          <UserMenu avatar-only class="shrink-0" />
+        </template>
+      </DashboardPageHeader>
+    </template>
     <InboxList v-model="selectedMail" :mails="filteredMails" />
   </UDashboardPanel>
 

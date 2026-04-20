@@ -1,4 +1,3 @@
-import type { UseFetchOptions } from "#app";
 import { useApi } from "~/composables/useApi";
 import type { UseApiOptions } from "~/composables/useApi";
 import { asCollectionOptions, asResourceOptions } from "./service-options";
@@ -41,8 +40,10 @@ export const timeOffService = {
   getCustomCompanyNonWorkDays,
   updateLeave,
   calculateRequestedDays,
+  checkOverlappingLeaves,
   getCCSettings,
   updateCCSettings,
+  patchCCSettingsById,
   getLeaveYearInfo,
   getCompanyLeaveYearSettings,
   updateCompanyLeaveYearSettings,
@@ -63,19 +64,32 @@ function getActiveLeaves(){
   })
 }
 
-function getLeaveComents(options: UseFetchOptions<Record<string, any>> = {}) {
+function getLeaveComents(options: UseApiOptions<Record<string, any>> = {}) {
   return useApi(`timeoffs/leave-comments`, options);
 }
 
-function getCCSettings() {
+function getCCSettings(options: UseApiOptions<Record<string, any>> = {}) {
   return useApi('/timeoffs/cc-settings/', {
     method: "GET",
+    ...options,
   });
 }
 
 function updateCCSettings(options: UseApiOptions<Record<string, any>> | Record<string, any> = {}) {
   return useApi('/timeoffs/cc-settings/', {
     ...asCollectionOptions(options, {
+      handler: "$fetch",
+      method: "PATCH",
+    }),
+  });
+}
+
+function patchCCSettingsById(
+  id: string,
+  options: UseApiOptions<Record<string, any>> | Record<string, any> = {},
+) {
+  return useApi(`/timeoffs/cc-settings/${id}/`, {
+    ...asResourceOptions(options, {
       handler: "$fetch",
       method: "PATCH",
     }),
@@ -91,11 +105,12 @@ function addComment(options: UseApiOptions<Record<string, any>> | Record<string,
   })
 }
 
-function deleteComment(comment_id: string){
+function deleteComment(comment_id: string) {
   return useApi(`/timeoffs/leave-comments/${comment_id}/`, {
     method: "DELETE",
+    handler: "$fetch",
   })
-} 
+}
 
 function getLeaveBalances(options?: Record<string, any>) {
   return useApi('/timeoffs/leave-balances', {
@@ -171,14 +186,14 @@ function getLeaveTimeline(id: string){
   });
 }
 
-function applyLeave(options: UseFetchOptions<Record<string, any>>){
+function applyLeave(options: UseApiOptions<Record<string, any>>){
   return useApi(`timeoffs/leaves/`, {
     method: "POST",
     ...options
   });
 }
 
-function getLeaves(options?: UseFetchOptions<Record<string, any>>){
+function getLeaves(options?: UseApiOptions<Record<string, any>>){
   return useApi('/timeoffs/leaves', options);
 }
 
@@ -189,7 +204,7 @@ function getLeaves(options?: UseFetchOptions<Record<string, any>>){
 //   });
 // }
 
-function getLeaveRequests(options?: UseFetchOptions<Record<string, any>>) {
+function getLeaveRequests(options?: UseApiOptions<Record<string, any>>) {
   return useApi('timeoffs/leaves/leave-requests', options);
 }
 
@@ -225,15 +240,20 @@ function removeEmployeesFromCategory(id: number, options: UseApiOptions<Record<s
   });
 }
 
-function getCompanyNonWorkDays() {
+function getCompanyNonWorkDays(options: UseApiOptions<Record<string, any>> = {}) {
   return useApi('/timeoffs/non-workdays', {
     method: "GET",
+    ...options,
   });
 }
 
-function getCustomCompanyNonWorkDays(params: string) {
+function getCustomCompanyNonWorkDays(
+  params: string,
+  options: UseApiOptions<Record<string, any>> = {},
+) {
   return useApi(`/timeoffs/non-workdays${params}`, {
     method: "GET",
+    ...options,
   });
 }
 
@@ -264,9 +284,10 @@ function addCompanyHoliday(options: UseApiOptions<Record<string, any>> | Record<
   });
 }
 
-function getCompanyHoliday() {
+function getCompanyHoliday(options: UseApiOptions<Record<string, any>> = {}) {
   return useApi('/timeoffs/public-holidays', {
     method: "GET",
+    ...options,
   });
 }
 
@@ -296,7 +317,7 @@ function updateLeaveCateories(leaveId: string, options: UseApiOptions<Record<str
   });
 }
 
-function getLeaveCategories(options?: UseFetchOptions<Record<string, any>>) {
+function getLeaveCategories(options?: UseApiOptions<Record<string, any>>) {
   return useApi('timeoffs/leave-categories/', options);
 }
 
@@ -333,14 +354,14 @@ function getLeaveLog() {
   });
 }
 
-function calculateRequestedDays(options: UseFetchOptions<Record<string, any>>) {
+function calculateRequestedDays(options: UseApiOptions<Record<string, any>>) {
   return useApi(`timeoffs/leaves/calculate-requested-days/`, {
     method: "POST",
     ...options
   });
 }
 
-function checkOverlappingLeaves(options: UseFetchOptions<Record<string, any>>) {
+function checkOverlappingLeaves(options: UseApiOptions<Record<string, any>>) {
   return useApi(`timeoffs/leaves/check-overlapping/`, {
     method: "POST",
     ...options
@@ -351,11 +372,11 @@ function getLeaveYearInfo() {
   return useApi(`timeoffs/leave-year-info/`);
 }
 
-function getCompanyLeaveYearSettings() {
-  return useApi(`timeoffs/company-leave-year-settings/`);
+function getCompanyLeaveYearSettings(options: UseApiOptions<Record<string, any>> = {}) {
+  return useApi(`timeoffs/company-leave-year-settings/`, options);
 }
 
-function updateCompanyLeaveYearSettings(options: UseFetchOptions<Record<string, any>>) {
+function updateCompanyLeaveYearSettings(options: UseApiOptions<Record<string, any>>) {
   return useApi(`timeoffs/company-leave-year-settings/`, {
     method: "PATCH",
     ...options

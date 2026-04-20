@@ -10,11 +10,14 @@ const props = withDefaults(defineProps<{
 <template>
   <UDashboardPanel :id="props.title.toLowerCase().replace(/\s+/g, '-')">
     <template #header>
-      <UDashboardNavbar :title="props.title">
-        <template #leading>
-          <UDashboardSidebarCollapse />
+      <DashboardPageHeader
+        :title="props.title"
+        :breadcrumb="`Dashboard / ${props.title}`"
+      >
+        <template #right>
+          <UserMenu avatar-only class="shrink-0" />
         </template>
-      </UDashboardNavbar>
+      </DashboardPageHeader>
     </template>
 
     <template #body>

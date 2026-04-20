@@ -8,6 +8,7 @@ export const employeeService = {
     createEmployee,
     updateEmployee,
     upload,
+    getImportJobStatus,
     resendActivationEmail,
     enableDisableAccess,
     streamFile,
@@ -113,6 +114,12 @@ function updateEmployee(id: string, options: UseApiOptions<Record<string, any>> 
 function upload(options: UseApiOptions<Record<string, any>> = {}) {
     return useApi('/employees/upload/', {
         method: 'POST',
+        ...options,
+    });
+}
+
+function getImportJobStatus(jobId: string, options: UseApiOptions<Record<string, any>> = {}) {
+    return useApi(`/employees/import-jobs/${jobId}/`, {
         ...options,
     });
 }
@@ -271,7 +278,7 @@ function updateEmployeeExtraPayRequest(id: string, options: UseApiOptions<Record
 }
 
 function deleteEmployeeExtraPay(id: string, options: UseApiOptions<Record<string, any>> = {}){
-    return useApi(`employees/extra-payments/${id}/`, {
+    return useApi(`/employees/extra-payments/${id}/`, {
         method: 'DELETE',
         ...options,
     })

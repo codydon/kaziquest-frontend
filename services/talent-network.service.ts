@@ -73,7 +73,10 @@ function rateTalentDocuments(options: UseApiOptions<Record<string, any>> | Recor
     handler: '$fetch',
     method:'PATCH',
   })
-  const { id, score} = resolvedOptions.body || {};
+  const body = (resolvedOptions.body && typeof resolvedOptions.body === 'object' && !(resolvedOptions.body instanceof FormData))
+    ? resolvedOptions.body as Record<string, any>
+    : {}
+  const { id, score } = body
   return useApi(`/talent-network/talent-network-documents/${id}/`, {
       ...resolvedOptions,
       body: {
@@ -87,7 +90,10 @@ function rateTalentExperience(options: UseApiOptions<Record<string, any>> | Reco
     handler: '$fetch',
     method:'PATCH',
   })
-  const { id, score} = resolvedOptions.body || {};
+  const body = (resolvedOptions.body && typeof resolvedOptions.body === 'object' && !(resolvedOptions.body instanceof FormData))
+    ? resolvedOptions.body as Record<string, any>
+    : {}
+  const { id, score } = body
   return useApi(`/talent-network/talent-network-experiences/${id}/`, {
       ...resolvedOptions,
       body: {
@@ -101,7 +107,10 @@ function rateTalentEducation(options: UseApiOptions<Record<string, any>> | Recor
     handler: '$fetch',
     method:'PATCH',
   })
-  const { id, score} = resolvedOptions.body || {};
+  const body = (resolvedOptions.body && typeof resolvedOptions.body === 'object' && !(resolvedOptions.body instanceof FormData))
+    ? resolvedOptions.body as Record<string, any>
+    : {}
+  const { id, score } = body
   return useApi(`/talent-network/talent-network-education/${id}/`, {
       ...resolvedOptions,
       body: {

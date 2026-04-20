@@ -1,4 +1,5 @@
 import type { RegistrationFlowState, RegistrationStep } from '~/types'
+import { REGISTRATION_VERIFY_EXPIRY_STORAGE_KEY } from '~/constants/authPersistence'
 
 const REGISTRATION_STATE_KEY = 'kq-registration-flow'
 const AFFILIATE_CODE_COOKIE = 'affiliate_code'
@@ -43,18 +44,48 @@ export const useRegistrationFlow = () => {
 
   const setVerifyCodeExpiry = (expiry: string | null) => {
     registrationFlow.value.verifyCodeExpiry = expiry
+    if (!import.meta.client) {
+      return
+    }
+    if (expiry) {
+      sessionStorage.setItem(REGISTRATION_VERIFY_EXPIRY_STORAGE_KEY, expiry)
+    } else {
+      sessionStorage.removeItem(REGISTRATION_VERIFY_EXPIRY_STORAGE_KEY)
+    }
   }
 
   const completeRegistration = () => {
     registrationFlow.value.isCompleted = true
     registrationFlow.value.registerDraft = null
-    registrationFlow.value.verifyCodeExpiry = null
+    setVerifyCodeExpiry(null)
     affiliateCodeCookie.value = null
   }
 
   const resetRegistration = () => {
     registrationFlow.value = createDefaultRegistrationState()
     affiliateCodeCookie.value = null
+    if (import.meta.client) {
+      sessionStorage.removeItem(REGISTRATION_VERIFY_EXPIRY_STORAGE_KEY)
+    }
+  }
+
+  const hydrateVerifyCodeExpiryFromStorage = () => {
+    if (!import.meta.client) {
+      return
+    }
+    if (registrationFlow.value.verifyCodeExpiry) {
+      return
+    }
+    const stored = sessionStorage.getItem(REGISTRATION_VERIFY_EXPIRY_STORAGE_KEY)
+    if (!stored) {
+      return
+    }
+    const expiresAt = new Date(stored).getTime()
+    if (Number.isNaN(expiresAt) || expiresAt <= Date.now()) {
+      sessionStorage.removeItem(REGISTRATION_VERIFY_EXPIRY_STORAGE_KEY)
+      return
+    }
+    registrationFlow.value.verifyCodeExpiry = stored
   }
 
   const initializeFromCookie = () => {
@@ -72,6 +103,7 @@ export const useRegistrationFlow = () => {
     setVerifyCodeExpiry,
     completeRegistration,
     resetRegistration,
-    initializeFromCookie
+    initializeFromCookie,
+    hydrateVerifyCodeExpiryFromStorage
   }
 }

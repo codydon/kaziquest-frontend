@@ -1,4 +1,4 @@
-
+import { unref } from "vue"
 import { useApi } from "~/composables/useApi"
 import type { UseApiOptions } from "~/composables/useApi"
 import { asCollectionOptions } from "./service-options"
@@ -19,12 +19,20 @@ export const subscriptionService = {
   getCurrentBilling,
 };
 
+function recordBody(resolved: ReturnType<typeof asCollectionOptions>) {
+  const rawBody = unref(resolved.body)
+  if (rawBody && typeof rawBody === 'object' && !(rawBody instanceof FormData) && !Array.isArray(rawBody)) {
+    return rawBody as Record<string, unknown>
+  }
+  return {}
+}
+
 function reduceJobLimit(options: UseApiOptions<Record<string, any>> | Record<string, any> = {}) {
   const resolvedOptions = asCollectionOptions(options, {
     handler: '$fetch',
     method: 'PATCH',
   })
-  const { id, job_limit } = resolvedOptions.body || {};
+  const { id, job_limit } = recordBody(resolvedOptions)
   return useApi(`/packages/subscriptions/${id}/`, {
       ...resolvedOptions,
       body: {
@@ -38,7 +46,7 @@ function removeFreeTrial(options: UseApiOptions<Record<string, any>> | Record<st
     handler: '$fetch',
     method: 'PATCH',
   })
-  const { id,free_trial } = resolvedOptions.body || {};
+  const { id, free_trial } = recordBody(resolvedOptions)
   
   return useApi(`/companies/${id}/`, {
       ...resolvedOptions,
@@ -126,7 +134,7 @@ function setSubscriptionTrial(options: UseApiOptions<Record<string, any>> | Reco
     handler: '$fetch',
     method: 'PATCH',
   })
-  const { id, active, status } = resolvedOptions.body || {}
+  const { id, active, status } = recordBody(resolvedOptions)
   return useApi(`/packages/subscriptions/${id}/`, {
     ...resolvedOptions,
     body: {
@@ -141,7 +149,7 @@ function completePayment(options: UseApiOptions<Record<string, any>> | Record<st
     handler: '$fetch',
     method: 'PATCH',
   })
-  const { id, expiry_date } = resolvedOptions.body || {}
+  const { id, expiry_date } = recordBody(resolvedOptions)
   return useApi(`/packages/subscriptions/${id}/`, {
     ...resolvedOptions,
     body: {

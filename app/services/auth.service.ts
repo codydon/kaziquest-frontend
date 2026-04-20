@@ -6,6 +6,7 @@ type ApiOptions = UseApiOptions<Record<string, unknown>>
 export const authService = {
   login,
   register,
+  verifyDomain,
   whmcsSSO,
   passwordResetRequest,
   linkTokenCheck,
@@ -29,6 +30,14 @@ function login(options: ApiOptions = {}) {
 
 function register(options: ApiOptions = {}) {
   return useApi(AUTH_API_PATHS.register, {
+    ...options,
+    method: 'POST',
+    secured: false
+  })
+}
+
+function verifyDomain(options: ApiOptions = {}) {
+  return useApi(AUTH_API_PATHS.verifyDomain, {
     ...options,
     method: 'POST',
     secured: false

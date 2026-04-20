@@ -1,5 +1,17 @@
 import { ROUTE_LIST } from '~/constants/routeList'
 
+/** Narrow session user for subscription / company fields without `any`. */
+interface UserCompanyCredits {
+  company?: {
+    kra_pin?: unknown
+    current_subscription?: {
+      status?: string
+      add_employee_credit?: unknown
+      job_posting_credit?: unknown
+    }
+  }
+}
+
 export const useAuthStore = () => {
   const {
     session,
@@ -12,7 +24,6 @@ export const useAuthStore = () => {
     setOtpSession,
     clearOtpSession,
     setFromRoute,
-    clearSession,
     logout
   } = useAuthSession()
 
@@ -88,32 +99,45 @@ export const useAuthStore = () => {
   const isAffiliateActive = computed(() => affiliateState.value.isAffiliateActive)
   const affiliateCode = computed(() => affiliateState.value.affiliateCode)
 
-  const currentSubscription = computed(() => (user.value as any)?.company?.current_subscription)
-  const isSubscriptionActive = computed(() => (user.value as any)?.company?.current_subscription?.status === 'ACTIVE')
+  const currentSubscription = computed(
+    () => (user.value as UserCompanyCredits).company?.current_subscription
+  )
+  const isSubscriptionActive = computed(
+    () => (user.value as UserCompanyCredits).company?.current_subscription?.status === 'ACTIVE'
+  )
+
+  function subscriptionCreditRemaining(raw: unknown): number | null {
+    if (raw == null || raw === '') {
+      return null
+    }
+    const n = typeof raw === 'number' ? raw : Number(raw)
+    if (!Number.isFinite(n)) {
+      return null
+    }
+    return n
+  }
 
   const isEmployeeLimitReached = computed(() => {
-    const credit = (user.value as any)?.company?.current_subscription?.add_employee_credit
+    const credit = subscriptionCreditRemaining(
+      (user.value as UserCompanyCredits).company?.current_subscription?.add_employee_credit
+    )
     if (credit == null) {
       return false
-    }
-    if (typeof credit !== 'number') {
-      return true
     }
     return credit < 1
   })
 
   const isJobPostLimitReached = computed(() => {
-    const credit = (user.value as any)?.company?.current_subscription?.job_posting_credit
+    const credit = subscriptionCreditRemaining(
+      (user.value as UserCompanyCredits).company?.current_subscription?.job_posting_credit
+    )
     if (credit == null) {
       return false
-    }
-    if (typeof credit !== 'number') {
-      return true
     }
     return credit < 1
   })
 
-  const isPayrollSetup = computed(() => Boolean((user.value as any)?.company?.kra_pin))
+  const isPayrollSetup = computed(() => Boolean((user.value as UserCompanyCredits).company?.kra_pin))
 
   const setOTPSessionAndEmail = (emailValue: string, sessionId: string) => {
     setOtpSession({

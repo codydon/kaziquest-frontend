@@ -181,7 +181,7 @@ function getApplication(application_id?: string) {
     })
 }
 
-function applyJob(options: UseFetchOptions<Record<string, any>>) {
+function applyJob(options: UseApiOptions<Record<string, any>>) {
     return useApi("/jobseekers/apply-job/", {
         method: 'POST',
         ...options

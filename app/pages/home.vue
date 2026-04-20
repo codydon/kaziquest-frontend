@@ -10,9 +10,9 @@ const items = [[{
   icon: 'i-lucide-briefcase-business',
   to: '/hiring/dashboard'
 }, {
-  label: 'Open people',
+  label: 'Open employees',
   icon: 'i-lucide-users',
-  to: '/people'
+  to: '/employees'
 }]] satisfies DropdownMenuItem[][]
 
 const range = shallowRef<Range>({
@@ -25,11 +25,10 @@ const period = ref<Period>('daily')
 <template>
   <UDashboardPanel id="home">
     <template #header>
-      <UDashboardNavbar title="Home" :ui="{ right: 'gap-3' }">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-
+      <DashboardPageHeader
+        title="Home"
+        breadcrumb="Dashboard / Home"
+      >
         <template #right>
           <UTooltip text="Notifications" :shortcuts="['N']">
             <UButton
@@ -47,15 +46,18 @@ const period = ref<Period>('daily')
           <UDropdownMenu :items="items">
             <UButton icon="i-lucide-plus" size="md" class="rounded-full" />
           </UDropdownMenu>
-        </template>
-      </UDashboardNavbar>
 
-      <UDashboardToolbar>
-        <template #left>
-          <HomeDateRangePicker v-model="range" class="-ms-1" />
-          <HomePeriodSelect v-model="period" :range="range" />
+          <UserMenu avatar-only class="shrink-0" />
         </template>
-      </UDashboardToolbar>
+        <template #toolbar>
+          <UDashboardToolbar>
+            <template #left>
+              <HomeDateRangePicker v-model="range" class="-ms-1" />
+              <HomePeriodSelect v-model="period" :range="range" />
+            </template>
+          </UDashboardToolbar>
+        </template>
+      </DashboardPageHeader>
     </template>
 
     <template #body>

@@ -30,7 +30,8 @@ const {
   setRegisterDraft,
   setVerifyCodeExpiry,
   completeRegistration,
-  initializeFromCookie
+  initializeFromCookie,
+  hydrateVerifyCodeExpiryFromStorage
 } = useRegistrationFlow()
 
 const registerLoading = ref(false)
@@ -270,6 +271,7 @@ const handlePasswordSubmit = async (payload: { password: string; careersite: str
 
 onMounted(async () => {
   initializeFromCookie()
+  hydrateVerifyCodeExpiryFromStorage()
 
   const referral = route.query.ref
   if (typeof referral === 'string' && referral.trim()) {

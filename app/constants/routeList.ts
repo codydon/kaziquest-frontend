@@ -3,8 +3,10 @@ export const ROUTE_LIST = {
   profile: '/my-profile',
   inactivity: '/inactivity',
   timeOff: {
-    applications: '/timeoff/leave-requests',
-    leaveBalances: '/timeoff/leave-balance'
+    applications: '/time-off/requests',
+    leaveBalances: '/time-off/balances',
+    /** Company time-off config (legacy employer: `settings#timeoffs`). */
+    settings: '/settings#timeoffs',
   },
   settings: {
     index: '/settings',
@@ -13,7 +15,9 @@ export const ROUTE_LIST = {
       createRole: '/settings/roles-permissions/create-role',
       editRole: '/settings/roles-permissions/edit-role'
     },
-    billing: '/settings#billing'
+    billing: '/settings#billing',
+    /** Legacy employer settings hash for Hiring module entry. */
+    hiring: '/settings#hiring'
   },
   reports: '/reports',
   auth: {
@@ -52,10 +56,11 @@ export const ROUTE_LIST = {
     review: '/payroll/:payrollId/review'
   },
   events: {
-    index: '/events-schedules'
+    index: '/events'
   },
   hiring: {
     index: '/hiring',
+    settings: '/hiring/settings',
     jobPostings: '/job-postings',
     createJobPosting: '/job-postings/new',
     applicants: '/applicants',

@@ -1,4 +1,6 @@
 const PAYROLL_STATE_KEY = 'kq-payroll-state'
+/** Mirrors legacy Pinia `persist: sessionStorage` for payroll wizard state (period exclusions, etc.). */
+const PAYROLL_SESSION_STORAGE_KEY = 'kq-payroll-state-session'
 
 function createDefaultPayrollSetupData() {
   return {
@@ -36,8 +38,55 @@ function createDefaultPayrollState() {
   }
 }
 
+function mergeSessionSnapshot(base: ReturnType<typeof createDefaultPayrollState>, snap: Record<string, unknown>) {
+  return {
+    ...base,
+    ...snap,
+    payrollSetupData: {
+      ...base.payrollSetupData,
+      ...(typeof snap.payrollSetupData === 'object' && snap.payrollSetupData !== null
+        ? (snap.payrollSetupData as Record<string, unknown>)
+        : {})
+    },
+    validationData: {
+      ...base.validationData,
+      ...(typeof snap.validationData === 'object' && snap.validationData !== null
+        ? (snap.validationData as Record<string, number>)
+        : {})
+    }
+  } as ReturnType<typeof createDefaultPayrollState>
+}
+
 export const usePayrollState = () => {
   const payrollState = useState(PAYROLL_STATE_KEY, createDefaultPayrollState)
+  const payrollSessionHydrated = useState('kq-payroll-session-hydrated', () => false)
+
+  if (import.meta.client && !payrollSessionHydrated.value) {
+    payrollSessionHydrated.value = true
+    try {
+      const raw = sessionStorage.getItem(PAYROLL_SESSION_STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw) as Record<string, unknown>
+        payrollState.value = mergeSessionSnapshot(createDefaultPayrollState(), parsed)
+      }
+    }
+    catch {
+      /* ignore corrupt storage */
+    }
+
+    watch(
+      payrollState,
+      (v) => {
+        try {
+          sessionStorage.setItem(PAYROLL_SESSION_STORAGE_KEY, JSON.stringify(v))
+        }
+        catch {
+          /* quota / private mode */
+        }
+      },
+      { deep: true },
+    )
+  }
 
   const generatePeriodKey = (fromDate: string, toDate: string): string => `${fromDate}|${toDate}`
 
@@ -101,6 +150,21 @@ export const usePayrollState = () => {
 
   const setSelectedPayrollYear = (year: number) => {
     payrollState.value.selectedPayrollYear = year
+  }
+
+  const setSelectedPayMonth = (month: number) => {
+    payrollState.value.selectedPayMonth = month
+  }
+
+  const setSelectedPayPeriod = (data: Record<string, unknown>) => {
+    payrollState.value.selectedPayPeriod = { ...data }
+  }
+
+  const setValidationTotalEmployees = (total: number) => {
+    payrollState.value.validationData = {
+      ...payrollState.value.validationData,
+      totalEmployees: total || 0
+    }
   }
 
   const setEmployeesExcluded = (employeesExcluded: string[], periodKey?: string) => {
@@ -194,6 +258,14 @@ export const usePayrollState = () => {
 
   const resetPayrollState = () => {
     payrollState.value = createDefaultPayrollState()
+    if (import.meta.client) {
+      try {
+        sessionStorage.removeItem(PAYROLL_SESSION_STORAGE_KEY)
+      }
+      catch {
+        /* ignore */
+      }
+    }
   }
 
   return {
@@ -211,6 +283,9 @@ export const usePayrollState = () => {
     setPayrollId,
     removePayrollId,
     setSelectedPayrollYear,
+    setSelectedPayMonth,
+    setSelectedPayPeriod,
+    setValidationTotalEmployees,
     setEmployeesExcluded,
     clearEmployeesExcluded,
     addManualExclusion,

@@ -23,12 +23,9 @@ const {
 } = useAuthSession()
 const { resetSessionTimeoutState } = useSessionTimeoutState()
 
-const otpCode = ref('')
 const loading = ref(false)
 const resendLoading = ref(false)
 const otpError = ref<string | null>(null)
-const nowTick = ref(Date.now())
-let countdownTimer: ReturnType<typeof setInterval> | null = null
 
 const otpSessionId = computed(() => session.value.otpSessionId)
 const otpEmail = computed(() => session.value.otpEmail)
@@ -42,61 +39,7 @@ const redirectPath = computed(() => {
   return redirect
 })
 
-const remainingSeconds = computed(() => {
-  if (!otpExpiry.value) {
-    return 0
-  }
-
-  const expiry = new Date(otpExpiry.value).getTime()
-  if (Number.isNaN(expiry)) {
-    return 0
-  }
-
-  return Math.max(0, Math.floor((expiry - nowTick.value) / 1000))
-})
-
-const formattedRemaining = computed(() => {
-  const minutes = Math.floor(remainingSeconds.value / 60)
-  const seconds = remainingSeconds.value % 60
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
-})
-
-const normalizedCode = computed(() => otpCode.value.replace(/\D/g, '').slice(0, 6))
-const otpExpired = computed(() => otpExpiry.value ? remainingSeconds.value <= 0 : false)
-const canVerify = computed(() => normalizedCode.value.length === 6 && Boolean(otpSessionId.value) && !otpExpired.value)
-const resendLabel = computed(() => otpExpired.value ? 'Resend code' : `Resend in ${formattedRemaining.value}`)
-
-const startCountdown = () => {
-  if (countdownTimer) {
-    clearInterval(countdownTimer)
-    countdownTimer = null
-  }
-
-  nowTick.value = Date.now()
-
-  if (!otpExpiry.value) {
-    return
-  }
-
-  countdownTimer = setInterval(() => {
-    nowTick.value = Date.now()
-  }, 1000)
-}
-
-const stopCountdown = () => {
-  if (countdownTimer) {
-    clearInterval(countdownTimer)
-    countdownTimer = null
-  }
-}
-
-watch(normalizedCode, (value) => {
-  if (value !== otpCode.value) {
-    otpCode.value = value
-  }
-})
-
-const verifyOtp = async () => {
+const verifyOtp = async (code: string) => {
   if (!otpSessionId.value) {
     otpError.value = 'Your OTP session is missing. Please sign in again.'
     return
@@ -110,7 +53,7 @@ const verifyOtp = async () => {
       handler: '$fetch',
       body: {
         otp_session_id: otpSessionId.value,
-        otp_code: normalizedCode.value
+        otp_code: code
       }
     })
 
@@ -180,9 +123,6 @@ const resendOtp = async () => {
       expiry: nextExpiry
     })
 
-    startCountdown()
-
-    otpCode.value = ''
     toast.add({
       title: 'Code resent',
       description: 'Check your email for the latest OTP code.',
@@ -197,80 +137,35 @@ const resendOtp = async () => {
   }
 }
 
+const goBackToLogin = async () => {
+  clearOtpSession()
+  await navigateTo({
+    path: ROUTE_LIST.auth.login,
+    query: redirectPath.value !== ROUTE_LIST.home ? { redirect: redirectPath.value } : undefined
+  })
+}
+
 onMounted(async () => {
   if (!otpSessionId.value) {
     await navigateTo(ROUTE_LIST.auth.login, { replace: true })
-    return
   }
-
-  startCountdown()
-})
-
-watch(otpExpiry, () => {
-  startCountdown()
-})
-
-onBeforeUnmount(() => {
-  stopCountdown()
 })
 </script>
 
 <template>
-  <AuthFormShell
+  <AuthRegisterVerifyStep
+    v-if="otpSessionId"
+    :email="otpEmail"
+    :loading="loading"
+    :resend-loading="resendLoading"
+    :code-expiry="otpExpiry"
+    :error-message="otpError"
     title="Verify one-time code"
     description="Enter the code sent to your email to complete sign in."
-  >
-    <div class="space-y-4">
-      <UAlert
-        color="neutral"
-        variant="soft"
-        icon="i-lucide-mail"
-        :title="`Code sent to ${otpEmail || 'your email'}`"
-      />
-
-      <UFormField label="One-time code" name="otp_code">
-        <UInput
-          v-model="otpCode"
-          class="w-full"
-          placeholder="Enter 6-digit code"
-          maxlength="6"
-          inputmode="numeric"
-          :disabled="otpExpired"
-        />
-      </UFormField>
-
-      <div class="flex items-center justify-between text-xs text-gray-500">
-        <span>Time remaining: {{ formattedRemaining }}</span>
-        <span v-if="otpExpired" class="text-error">Code expired</span>
-      </div>
-
-      <UAlert
-        v-if="otpError"
-        color="error"
-        variant="soft"
-        icon="i-lucide-alert-circle"
-        :title="otpError"
-      />
-
-      <div class="flex items-center justify-between gap-3">
-        <NuxtLink class="text-sm text-primary hover:underline" :to="ROUTE_LIST.auth.login">
-          Back to login
-        </NuxtLink>
-
-        <UButton
-          variant="link"
-          color="primary"
-          :loading="resendLoading"
-          :disabled="!otpExpired || resendLoading"
-          @click="resendOtp"
-        >
-          {{ resendLabel }}
-        </UButton>
-      </div>
-
-      <UButton type="button" block :loading="loading" :disabled="!canVerify" @click="verifyOtp">
-        Verify
-      </UButton>
-    </div>
-  </AuthFormShell>
+    submit-label="Verify"
+    back-label="Back to login"
+    @submit="verifyOtp"
+    @resend="resendOtp"
+    @back="goBackToLogin"
+  />
 </template>

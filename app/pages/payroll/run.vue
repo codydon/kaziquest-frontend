@@ -1,6 +1,13 @@
+<script setup lang="ts">
+definePageMeta({
+  layout: 'default'
+})
+
+await navigateTo('/payroll', { replace: true })
+</script>
+
 <template>
-  <PagePlaceholder
-    title="Run Payroll"
-    description="Run Payroll page scaffolded for migration."
-  />
+  <div class="p-6 text-sm text-muted">
+    Redirecting…
+  </div>
 </template>

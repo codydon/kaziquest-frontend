@@ -228,7 +228,7 @@ async function submitDelete() {
             label="View Users"
             color="neutral"
             variant="outline"
-            to="/people"
+            to="/employees"
           />
         </template>
 

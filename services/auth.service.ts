@@ -1,4 +1,3 @@
-export { authService } from '../app/services/auth.service'
 import { useApi, type UseApiOptions } from "~/composables/useApi";
 import { useAuth } from "~/composables/useAuth";
 import type { IRole } from "~/types";

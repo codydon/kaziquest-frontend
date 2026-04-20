@@ -68,6 +68,11 @@ export type AuthUser = Record<string, unknown> & {
   name?: string
   first_name?: string
   last_name?: string
+  full_name?: string
+  profile_pic?: string | null
+  profile_picture?: string | null
+  photo?: string | null
+  avatar?: string | null
   company?: Record<string, unknown> | null
   group?: Record<string, unknown> | null
 }

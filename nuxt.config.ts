@@ -37,6 +37,15 @@ export default defineNuxtConfig({
     public: publicRuntimeConfig
   },
 
+  $development: {
+    vite: {
+      server: {
+        // Allows all hosts only during development
+        allowedHosts: true 
+      }
+    }
+  },
+
   routeRules: {
     '/api/**': {
       cors: true

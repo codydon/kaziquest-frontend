@@ -13,17 +13,20 @@ const settingsBodyClass = computed(() => {
 <template>
   <UDashboardPanel id="settings" :ui="{ body: settingsBodyClass }">
     <template #header>
-      <UDashboardNavbar title="Settings">
-        <template #leading>
-          <UDashboardSidebarCollapse />
+      <DashboardPageHeader
+        title="Settings"
+        breadcrumb="Dashboard / Settings"
+      >
+        <template #right>
+          <UserMenu avatar-only class="shrink-0" />
         </template>
-      </UDashboardNavbar>
+      </DashboardPageHeader>
     </template>
 
     <template #body>
       <div
-        class="mx-auto flex w-full flex-col"
-        :class="isWideSettingsPage ? 'max-w-5xl gap-4 sm:gap-5 lg:gap-6' : 'max-w-2xl gap-4 sm:gap-6 lg:gap-8'"
+        class="mx-auto flex w-full min-w-0 flex-col"
+        :class="isWideSettingsPage ? 'max-w-6xl gap-4 sm:gap-5 lg:gap-6' : 'max-w-5xl gap-4 sm:gap-6 lg:gap-8'"
       >
         <NuxtPage />
       </div>

@@ -3,6 +3,10 @@ export default defineAppConfig({
     colors: {
       primary: 'kaziquest',
       neutral: 'zinc'
+    },
+    icons: {
+      panelOpen: 'i-lucide-chevron-right',
+      panelClose: 'i-lucide-chevron-left'
     }
   }
 })

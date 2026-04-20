@@ -1,4 +1,5 @@
 import type { UseFetchOptions } from "#app"
+import { unref } from "vue"
 import { useApi } from "~/composables/useApi"
 import type { UseApiOptions } from "~/composables/useApi"
 import { asCollectionOptions, asResourceOptions } from "./service-options"
@@ -58,8 +59,11 @@ function removeApprover(appId: string){
   })
 }
 
-function getApprovers(){
+function getApprovers(options: UseApiOptions<Record<string, any>> = {}) {
   return useApi('/companies/approvers/', {
+    handler: '$fetch',
+    method: 'GET',
+    ...options,
   })
 }
 
@@ -112,11 +116,11 @@ function createDepartment(options: UseApiOptions<Record<string, any>> | Record<s
   });
 }
 
-function fetchDepartments() {
+function fetchDepartments(options: UseApiOptions<Record<string, any>> = {}) {
   return useApi('/companies/departments/', {
     method: 'GET',
-  });
-
+    ...options
+  })
 }
 
 function updateDepartment(deptId: number, options: UseApiOptions<Record<string, any>> | Record<string, any> = {}) {
@@ -150,12 +154,16 @@ function createPosition(options: UseApiOptions<Record<string, any>> | Record<str
 
 // }
 
-function fetchPositions(urlParams?: Record<string, string|number>) {
+function fetchPositions(
+  urlParams?: Record<string, string | number>,
+  options: UseApiOptions<Record<string, unknown>> = {}
+) {
   return useApi(`/companies/positions/${urlParamsExtensionUtil(urlParams ?? {})}`, {
     handler: '$fetch',
     method: 'GET',
-  });
-
+    secured: true,
+    ...options
+  })
 }
 
 //update position
@@ -200,7 +208,12 @@ function addSMSDrivers(options: UseApiOptions<Record<string, any>> | Record<stri
     handler: '$fetch',
     method: 'POST',
   })
-  const { username, sender_id, api_key, client_secret, provider_id } = resolvedOptions.body || {}
+  const rawBody = unref(resolvedOptions.body)
+  const body =
+    rawBody && typeof rawBody === 'object' && !(rawBody instanceof FormData) && !Array.isArray(rawBody)
+      ? (rawBody as Record<string, unknown>)
+      : {}
+  const { username, sender_id, api_key, client_secret, provider_id } = body
 
   return useApi('/companies/sms-drivers/', {
     ...resolvedOptions,
@@ -219,7 +232,12 @@ function updateDrivers(options: UseApiOptions<Record<string, any>> | Record<stri
     handler: '$fetch',
     method: 'PATCH',
   })
-  const { username, sender_id, api_key, client_secret, id, provider_id } = resolvedOptions.body || {}
+  const rawBody = unref(resolvedOptions.body)
+  const body =
+    rawBody && typeof rawBody === 'object' && !(rawBody instanceof FormData) && !Array.isArray(rawBody)
+      ? (rawBody as Record<string, unknown>)
+      : {}
+  const { username, sender_id, api_key, client_secret, id, provider_id } = body
 
   return useApi(`/companies/sms-drivers/${id}/`, {
     ...resolvedOptions,

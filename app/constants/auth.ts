@@ -11,7 +11,8 @@ export const AUTH_API_PATHS = {
   resendLoginOtp: '/accounts/login/otp/resend/',
   verifyActivationCode: '/accounts/verify/verify_activation_code/',
   resendActivationCode: '/accounts/verify/resend_activation_code/',
-  createCareerSite: '/companies/create-subdomain/'
+  createCareerSite: '/companies/create-subdomain/',
+  verifyDomain: '/accounts/verify-domain/'
 } as const
 
 export const AUTH_EXCLUDED_PATHS: readonly string[] = [

@@ -1,13 +1,22 @@
 <script setup lang="ts">
 const OTP_LENGTH = 6
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   email: string
   loading: boolean
   resendLoading: boolean
   codeExpiry?: string | null
   errorMessage?: string | null
-}>()
+  title?: string
+  description?: string
+  submitLabel?: string
+  backLabel?: string
+}>(), {
+  title: 'Verify your email',
+  description: 'Enter the six-digit verification code sent to your inbox.',
+  submitLabel: 'Verify code',
+  backLabel: 'Back'
+})
 
 const emit = defineEmits<{
   submit: [code: string]
@@ -128,12 +137,23 @@ onBeforeUnmount(() => {
     timer = null
   }
 })
+
+watch(
+  () => props.errorMessage,
+  (message) => {
+    if (!message) {
+      return
+    }
+    inputs.value = Array(OTP_LENGTH).fill('')
+    nextTick(() => focusInput(0))
+  }
+)
 </script>
 
 <template>
   <AuthFormShell
-    title="Verify your email"
-    description="Enter the six-digit verification code sent to your inbox."
+    :title="props.title"
+    :description="props.description"
   >
     <div class="space-y-4">
       <UAlert
@@ -179,7 +199,7 @@ onBeforeUnmount(() => {
 
       <div class="flex items-center justify-between gap-3">
         <UButton variant="ghost" color="neutral" @click="emit('back')">
-          Back
+          {{ props.backLabel }}
         </UButton>
 
         <UButton
@@ -200,7 +220,7 @@ onBeforeUnmount(() => {
         :disabled="!isCodeComplete || isCodeExpired"
         @click="submit"
       >
-        Verify code
+        {{ props.submitLabel }}
       </UButton>
     </div>
   </AuthFormShell>

@@ -1,12 +1,39 @@
 import type { AuthMethod, AuthSessionState, AuthUser } from '~/types'
+import { AUTH_SESSION_STATE_KEY, OTP_SESSION_STORAGE_KEY } from '~/constants/authPersistence'
 
-const AUTH_SESSION_STATE_KEY = 'kq-auth-session'
 const AUTH_SESSION_HYDRATED_KEY = 'kq-auth-session-hydrated'
 const AUTH_SESSION_HYDRATING_KEY = 'kq-auth-session-hydrating'
 const ACCESS_TOKEN_COOKIE = 'access'
 const REFRESH_TOKEN_COOKIE = 'refresh'
 
-function createDefaultAuthSessionState(): AuthSessionState {
+function persistOtpSessionSnapshot(snapshot: AuthSessionState) {
+  if (!import.meta.client) {
+    return
+  }
+
+  if (!snapshot.otpSessionId) {
+    sessionStorage.removeItem(OTP_SESSION_STORAGE_KEY)
+    return
+  }
+
+  sessionStorage.setItem(
+    OTP_SESSION_STORAGE_KEY,
+    JSON.stringify({
+      email: snapshot.otpEmail,
+      sessionId: snapshot.otpSessionId,
+      expiry: snapshot.otpExpiry
+    })
+  )
+}
+
+function clearPersistedOtpSession() {
+  if (!import.meta.client) {
+    return
+  }
+  sessionStorage.removeItem(OTP_SESSION_STORAGE_KEY)
+}
+
+export function createDefaultAuthSessionState(): AuthSessionState {
   return {
     user: null,
     authMethod: 'password',
@@ -75,12 +102,14 @@ export const useAuthSession = () => {
     authSession.value.otpEmail = payload.email
     authSession.value.otpSessionId = payload.sessionId
     authSession.value.otpExpiry = payload.expiry ?? null
+    persistOtpSessionSnapshot(authSession.value)
   }
 
   const clearOtpSession = () => {
     authSession.value.otpEmail = ''
     authSession.value.otpSessionId = ''
     authSession.value.otpExpiry = null
+    clearPersistedOtpSession()
   }
 
   const setFromRoute = (fromRoute: string | null) => {
@@ -94,6 +123,7 @@ export const useAuthSession = () => {
   const clearSession = () => {
     accessToken.value = null
     refreshToken.value = null
+    clearPersistedOtpSession()
     authSession.value = createDefaultAuthSessionState()
   }
 

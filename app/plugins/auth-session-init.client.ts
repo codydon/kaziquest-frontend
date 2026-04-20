@@ -36,12 +36,15 @@ export default defineNuxtPlugin((nuxtApp) => {
       }
 
       const hasUser = Boolean(session.value.user && Object.keys(session.value.user).length > 0)
-      if (hasUser) {
+      const persistedUser = session.value.user as { group?: { name?: string } } | null | undefined
+      const groupReady = Boolean(persistedUser && String(persistedUser.group?.name ?? '').trim())
+      if (hasUser && groupReady) {
         return
       }
 
       const response = await authService.fetchAuthUser({
-        handler: '$fetch'
+        handler: '$fetch',
+        secured: true
       })
       const payload = (response as Record<string, any>)?.data ?? (response as Record<string, any>)
       const userData = (payload?.data ?? payload) as Record<string, any>
