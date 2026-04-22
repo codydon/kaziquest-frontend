@@ -4,6 +4,7 @@ import type { UseApiOptions } from "~/composables/useApi"
 export const employeeService = {
     getEmployees,
     getEmployee,
+    getEmployeeEmails,
     getEmployeeRaw,
     createEmployee,
     updateEmployee,
@@ -91,6 +92,10 @@ function getEmployees(options: UseApiOptions<Record<string, any>> = {}){
 
 function getEmployee(id: string, options: UseApiOptions<Record<string, any>> = {}){
     return useApi(`/employees/${id}`, options);
+}
+
+function getEmployeeEmails(id: string, options: UseApiOptions<Record<string, any>> = {}){
+    return useApi(`/employees/${id}/emails/`, options);
 }
 
 async function getEmployeeRaw(id: string, options: UseApiOptions<Record<string, any>> = {}){

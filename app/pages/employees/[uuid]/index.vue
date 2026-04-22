@@ -311,6 +311,7 @@ const tabItem = [
   { label: 'Education', value: 'education' },
   { label: 'Job', value: 'job' },
   { label: 'Timeoffs', value: 'timeoffs' },
+  { label: 'Emails', value: 'emails' },
   { label: 'Assets', value: 'assets' },
   { label: 'Documents', value: 'documents' },
   { label: 'Disciplinary', value: 'disciplinary' },
@@ -529,6 +530,9 @@ useSeoMeta({
               </div>
             </template>
           </UAlert>
+        </div>
+        <div v-show="selectedTab === 'emails'">
+          <EmployeesEmailsTab v-if="employee.id" :employee-id="String(employee.id)" />
         </div>
         <div v-show="selectedTab === 'assets'">
           <EmployeesAssetsTab v-if="employee.id" :employee-id="String(employee.id)" />
