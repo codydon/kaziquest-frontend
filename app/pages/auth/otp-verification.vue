@@ -65,8 +65,7 @@ const verifyOtp = async (code: string) => {
     }
 
     setAuthTokens({
-      accessToken: String(userData.access),
-      refreshToken: typeof userData.refresh === 'string' ? userData.refresh : null
+      accessToken: String(userData.access)
     })
 
     const { access: _access, refresh: _refresh, ...user } = userData

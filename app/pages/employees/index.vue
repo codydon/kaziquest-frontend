@@ -135,8 +135,7 @@ async function ensureAuthProfileReady() {
     }
     if (typeof userData.access === 'string' && userData.access) {
       setAuthTokens({
-        accessToken: userData.access,
-        refreshToken: typeof userData.refresh === 'string' ? userData.refresh : null
+        accessToken: userData.access
       })
     }
     const { access: _access, refresh: _refresh, ...user } = userData

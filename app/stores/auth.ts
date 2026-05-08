@@ -16,7 +16,6 @@ export const useAuthStore = () => {
   const {
     session,
     token,
-    refreshToken,
     isAuthenticated,
     setAuthTokens,
     setUser,
@@ -192,7 +191,6 @@ export const useAuthStore = () => {
     otp_session_id,
     otp_expiry,
     token,
-    refreshToken,
     from_route,
     show_signup,
     payment_section,

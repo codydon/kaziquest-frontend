@@ -60,8 +60,7 @@ const runImpersonation = async () => {
       : impersonationToken.value
 
     setAuthTokens({
-      accessToken,
-      refreshToken: typeof userData.refresh === 'string' ? userData.refresh : null
+      accessToken
     })
 
     const { access: _access, refresh: _refresh, ...userWithoutTokens } = userData
@@ -96,6 +95,7 @@ const runImpersonation = async () => {
 }
 
 onMounted(async () => {
+  removeTokenFromUrl()
   await runImpersonation()
 })
 </script>

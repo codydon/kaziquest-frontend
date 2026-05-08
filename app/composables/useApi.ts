@@ -101,8 +101,8 @@ export function useApi<T = any>(
       refreshMetrics.value.attempts += 1
       try {
         const { useTokenRefresh } = await import("~/composables/useTokenRefresh")
-        const { refreshToken } = useTokenRefresh()
-        await refreshToken()
+        const { refreshAccessToken } = useTokenRefresh()
+        await refreshAccessToken()
         refreshMetrics.value.successes += 1
         return true
       } catch {

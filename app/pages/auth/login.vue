@@ -111,8 +111,7 @@ const handleDirectTokenLogin = async (token: string) => {
       : token
 
     setAuthTokens({
-      accessToken,
-      refreshToken: typeof userData.refresh === 'string' ? userData.refresh : null
+      accessToken
     })
 
     const { access: _access, refresh: _refresh, ...user } = userData
@@ -188,8 +187,7 @@ const handleLogin = async () => {
     }
 
     setAuthTokens({
-      accessToken: String(userData.access),
-      refreshToken: typeof userData.refresh === 'string' ? userData.refresh : null
+      accessToken: String(userData.access)
     })
 
     const { access: _access, refresh: _refresh, ...user } = userData
@@ -230,6 +228,7 @@ onMounted(async () => {
     return
   }
 
+  removeTokenFromUrl()
   directLoginDone.value = true
   await handleDirectTokenLogin(routeToken)
 })

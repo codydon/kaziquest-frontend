@@ -55,8 +55,7 @@ export default defineNuxtPlugin((nuxtApp) => {
 
       if (typeof userData.access === 'string' && userData.access) {
         setAuthTokens({
-          accessToken: userData.access,
-          refreshToken: typeof userData.refresh === 'string' ? userData.refresh : null
+          accessToken: userData.access
         })
       }
 

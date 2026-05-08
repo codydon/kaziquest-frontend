@@ -1,6 +1,6 @@
 export const AUTH_API_PATHS = {
   login: '/accounts/login/',
-  refreshToken: '/accounts/token/refresh/',
+  tokenRefresh: '/accounts/token/refresh/',
   register: '/accounts/users/',
   authUser: '/accounts/users/auth-user/',
   whmcsSso: '/accounts/whmcs-sso/',
@@ -17,7 +17,7 @@ export const AUTH_API_PATHS = {
 
 export const AUTH_EXCLUDED_PATHS: readonly string[] = [
   AUTH_API_PATHS.login,
-  AUTH_API_PATHS.refreshToken,
+  AUTH_API_PATHS.tokenRefresh,
   AUTH_API_PATHS.passwordResetRequest,
   AUTH_API_PATHS.passwordResetComplete,
   '/accounts/check-email/',

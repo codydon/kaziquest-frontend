@@ -4,10 +4,9 @@ import { AUTH_SESSION_STATE_KEY, OTP_SESSION_STORAGE_KEY } from '~/constants/aut
 const AUTH_SESSION_HYDRATED_KEY = 'kq-auth-session-hydrated'
 const AUTH_SESSION_HYDRATING_KEY = 'kq-auth-session-hydrating'
 const ACCESS_TOKEN_COOKIE = 'access'
-const REFRESH_TOKEN_COOKIE = 'refresh'
 
 function persistOtpSessionSnapshot(snapshot: AuthSessionState) {
-  if (!import.meta.client) {
+  if (typeof window === 'undefined') {
     return
   }
 
@@ -27,7 +26,7 @@ function persistOtpSessionSnapshot(snapshot: AuthSessionState) {
 }
 
 function clearPersistedOtpSession() {
-  if (!import.meta.client) {
+  if (typeof window === 'undefined') {
     return
   }
   sessionStorage.removeItem(OTP_SESSION_STORAGE_KEY)
@@ -47,36 +46,27 @@ export function createDefaultAuthSessionState(): AuthSessionState {
 
 export interface AuthTokenPair {
   accessToken: string | null
-  refreshToken?: string | null
 }
 
 export const useAuthSession = () => {
   const config = useRuntimeConfig()
   const isSecureCookie = Boolean(config.public.apiBase?.startsWith('https://'))
   const apiBase = useBaseUrl()
+  const accessTokenMaxAgeSeconds = Number(config.public.authAccessTokenMaxAgeSeconds ?? 60 * 15)
 
   const authSession = useState<AuthSessionState>(AUTH_SESSION_STATE_KEY, createDefaultAuthSessionState)
-  const isHydrating = useState<boolean>(AUTH_SESSION_HYDRATING_KEY, () => import.meta.client)
-  const hasHydrated = useState<boolean>(AUTH_SESSION_HYDRATED_KEY, () => import.meta.server)
+  const isHydrating = useState<boolean>(AUTH_SESSION_HYDRATING_KEY, () => typeof window !== 'undefined')
+  const hasHydrated = useState<boolean>(AUTH_SESSION_HYDRATED_KEY, () => typeof window === 'undefined')
 
   const accessToken = useCookie<string | null>(ACCESS_TOKEN_COOKIE, {
     path: '/',
     sameSite: 'lax',
     secure: isSecureCookie,
-    maxAge: 60 * 60 * 24 * 7,
-    default: () => null
-  })
-
-  const refreshToken = useCookie<string | null>(REFRESH_TOKEN_COOKIE, {
-    path: '/',
-    sameSite: 'lax',
-    secure: isSecureCookie,
-    maxAge: 60 * 60 * 24 * 365,
+    maxAge: accessTokenMaxAgeSeconds,
     default: () => null
   })
 
   const effectiveAccessToken = computed(() => accessToken.value)
-  const effectiveRefreshToken = computed(() => refreshToken.value)
 
   const hasStoredUser = computed(() => {
     const user = authSession.value.user
@@ -87,7 +77,6 @@ export const useAuthSession = () => {
 
   const setAuthTokens = (tokens: AuthTokenPair) => {
     accessToken.value = tokens.accessToken
-    refreshToken.value = tokens.refreshToken ?? null
   }
 
   const setUser = (user: AuthUser | null) => {
@@ -122,7 +111,6 @@ export const useAuthSession = () => {
 
   const clearSession = () => {
     accessToken.value = null
-    refreshToken.value = null
     clearPersistedOtpSession()
     authSession.value = createDefaultAuthSessionState()
   }
@@ -136,17 +124,13 @@ export const useAuthSession = () => {
     hasHydrated.value = true
   }
 
-  const revokeRefreshToken = async (tokenToRevoke: string | null) => {
-    if (!tokenToRevoke) {
-      return
-    }
-
+  const revokeRefreshToken = async () => {
     try {
-      await $fetch(`${apiBase}/accounts/logout/`, {
+      await useApi(`${apiBase}/accounts/logout/`, {
+        handler: '$fetch',
         method: 'POST',
-        body: {
-          refresh_token: tokenToRevoke
-        }
+        secured: true,
+        credentials: 'include'
       })
     } catch {
       // Logout should still succeed locally even if the revocation API fails.
@@ -154,15 +138,13 @@ export const useAuthSession = () => {
   }
 
   const logout = async () => {
-    const tokenToRevoke = refreshToken.value
     clearSession()
-    await revokeRefreshToken(tokenToRevoke)
+    await revokeRefreshToken()
   }
 
   return {
     session: readonly(authSession),
     token: readonly(effectiveAccessToken),
-    refreshToken: readonly(effectiveRefreshToken),
     isHydrating: readonly(isHydrating),
     hasHydrated: readonly(hasHydrated),
     isAuthenticated,

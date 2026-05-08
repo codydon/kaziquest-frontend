@@ -17,6 +17,20 @@ const error = ref<string | null>(null)
 
 const ssoToken = computed(() => (typeof route.query.token === 'string' ? route.query.token : ''))
 
+const removeTokenFromUrl = () => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  const url = new URL(window.location.href)
+  if (!url.searchParams.has('token')) {
+    return
+  }
+
+  url.searchParams.delete('token')
+  window.history.replaceState({}, '', url.toString())
+}
+
 const attemptSso = async () => {
   if (!ssoToken.value) {
     error.value = 'No SSO token was provided.'
@@ -45,8 +59,7 @@ const attemptSso = async () => {
     }
 
     setAuthTokens({
-      accessToken: authPayload.access,
-      refreshToken: typeof authPayload.refresh === 'string' ? authPayload.refresh : null
+      accessToken: authPayload.access
     })
 
     const { access: _access, refresh: _refresh, ...userWithoutTokens } = authPayload
@@ -89,6 +102,7 @@ const retrySso = async () => {
 }
 
 onMounted(async () => {
+  removeTokenFromUrl()
   await attemptSso()
 })
 </script>
