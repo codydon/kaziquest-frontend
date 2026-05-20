@@ -35,7 +35,7 @@ const schema = z.object({
   ),
   salary: z.preprocess(
     v => (v === '' || v === undefined || v === null ? undefined : Number(v)),
-    z.number({ invalid_type_error: 'Salary is required' }).min(1, 'Salary is required')
+    z.number({ error: 'Salary is required' }).min(1, 'Salary is required')
   ),
   start_date: z.preprocess(
     val => (val === null || val === undefined ? '' : String(val)),

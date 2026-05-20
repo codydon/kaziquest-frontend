@@ -138,8 +138,8 @@ export const useAuthSession = () => {
   }
 
   const logout = async () => {
-    clearSession()
     await revokeRefreshToken()
+    clearSession()
   }
 
   return {

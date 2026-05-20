@@ -1,5 +1,4 @@
 import { useApi, type UseApiOptions } from "~/composables/useApi";
-import { useAuth } from "~/composables/useAuth";
 import type { IRole } from "~/types";
 import type { UseFetchOptions } from "#app";
 
@@ -86,11 +85,10 @@ function login(options: ApiOptions) {
 }
 
 function logout(options: ApiOptions = {}) {
-    const { refreshToken } = useAuth();
     return useApi(`/accounts/logout/`, {
         ...options,
         method: 'POST',
-        body: { refresh_token: refreshToken.value }
+        credentials: 'include'
     })
 }
 
@@ -124,15 +122,11 @@ function whmcsSSO(options: UseFetchOptions<Record<string, any>>) {
 // }
 
 function refreshToken(options: ApiOptions = {}) {
-    const { refreshToken: refreshTokenCookie } = useAuth();
-    if (!refreshTokenCookie.value) {
-        return Promise.reject(new Error('No refresh token available'));
-    }
     return useApi(`/accounts/token/refresh/`, {
         ...options,
         method: 'POST',
-        body: { refresh: refreshTokenCookie.value },
-        secured: false
+        secured: false,
+        credentials: 'include'
     })
 }
 

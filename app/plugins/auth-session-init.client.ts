@@ -1,6 +1,7 @@
 import { publicPages } from '~~/constants/publicRoutes'
 import { ROUTE_LIST } from '~/constants/routeList'
 import { authService } from '~/services/auth.service'
+import { useTokenRefresh } from '~/composables/useTokenRefresh'
 
 const isPublicRoute = (path: string) => {
   return (
@@ -32,7 +33,8 @@ export default defineNuxtPlugin((nuxtApp) => {
 
     try {
       if (!token.value) {
-        return
+        const { refreshAccessToken } = useTokenRefresh()
+        await refreshAccessToken()
       }
 
       const hasUser = Boolean(session.value.user && Object.keys(session.value.user).length > 0)
