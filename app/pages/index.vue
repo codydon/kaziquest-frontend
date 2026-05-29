@@ -6,6 +6,7 @@ const { isAuthenticated, isHydrating } = useAuthSession()
 watch(
 	() => isHydrating.value,
 	async (hydrating) => {
+		if (import.meta.server) return
 		if (hydrating) {
 			return
 		}
